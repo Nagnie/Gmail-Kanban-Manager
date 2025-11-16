@@ -36,8 +36,8 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                         <ModeToggle />
                     </div>
                 </header>
-                <main className="flex-1 flex flex-col">
-                    <div className="flex-1 overflow-auto p-4">
+                <main className="flex-1 flex flex-col bg-sidebar">
+                    <div className="flex-1 overflow-auto">
                         {children}
                     </div>
                 </main>

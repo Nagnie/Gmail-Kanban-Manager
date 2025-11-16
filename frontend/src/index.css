@@ -21,6 +21,8 @@
   --foreground: oklch(0.13 0.028 261.692);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.13 0.028 261.692);
+  --mail-selected: oklch(93.2% 0.032 255.585);
+  --mail-foreground: oklch(54.6% 0.245 262.881);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.13 0.028 261.692);
   --primary: oklch(0.21 0.034 264.665);
@@ -80,6 +82,8 @@
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
+  --color-mail-selected: var(--mail-selected);
+  --color-mail-foreground: var(--mail-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
@@ -122,6 +126,8 @@
   --foreground: oklch(0.985 0.002 247.839);
   --card: oklch(0.21 0.034 264.665);
   --card-foreground: oklch(0.985 0.002 247.839);
+  --mail-selected: oklch(28.2% 0.091 267.935);
+  --mail-foreground: oklch(62.3% 0.214 259.815);
   --popover: oklch(0.21 0.034 264.665);
   --popover-foreground: oklch(0.985 0.002 247.839);
   --primary: oklch(0.928 0.006 264.531);

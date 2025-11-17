@@ -1,0 +1,286 @@
+{
+    "mailboxes": [
+        { "id": "inbox", "name": "Inbox", "unreadCount": 5 },
+        { "id": "sent", "name": "Sent", "unreadCount": 0 },
+        { "id": "drafts", "name": "Drafts", "unreadCount": 2 },
+        { "id": "trash", "name": "Trash", "unreadCount": 0 }
+    ],
+    "emails": [
+        {
+            "id": 1,
+            "mailboxId": "inbox",
+            "from": { "name": "Alice Nguyen", "email": "alice@example.com" },
+            "to": [{ "name": "You", "email": "you@example.com" }],
+            "subject": "Welcome to the project",
+            "preview": "Hi — welcome aboard. Please find initial notes inside...",
+            "timestamp": "2025-11-15T09:12:00.000Z",
+            "isRead": false,
+            "bodyHtml": "<p>Hi there,</p><p>Welcome to the project. Here are some starter tasks...</p>",
+            "attachments": [
+                { "name": "Project_Onboarding.pdf", "size": "1.2 MB" },
+                { "name": "Starter_Checklist.xlsx", "size": "24 KB" }
+            ]
+        },
+        {
+            "id": 2,
+            "mailboxId": "inbox",
+            "from": { "name": "Bob Tran", "email": "bob@example.com" },
+            "to": [{ "name": "You", "email": "you@example.com" }],
+            "subject": "Design review notes",
+            "preview": "I reviewed the design and left comments on...",
+            "timestamp": "2025-11-14T14:30:00.000Z",
+            "isRead": true,
+            "bodyHtml": "<p>Thanks for sharing the design. I suggest we...</p>"
+        },
+        {
+            "id": 3,
+            "mailboxId": "sent",
+            "from": { "name": "You", "email": "you@example.com" },
+            "to": [{ "name": "Client", "email": "client@example.com" }],
+            "subject": "Re: Project timeline",
+            "preview": "I've attached the updated timeline. See the notes...",
+            "timestamp": "2025-11-13T08:05:00.000Z",
+            "isRead": true,
+            "bodyHtml": "<p>Dear client,</p><p>Please find attached...</p>",
+            "attachments": [{ "name": "Project_Timeline_v2.pdf", "size": "340 KB" }]
+        },
+        {
+            "id": 4,
+            "mailboxId": "inbox",
+            "from": { "name": "Product Team", "email": "product@example.com" },
+            "to": [{ "name": "You", "email": "you@example.com" }],
+            "subject": "Sprint planning notes",
+            "preview": "Please review sprint scope for next week...",
+            "timestamp": "2025-11-12T10:20:00.000Z",
+            "isRead": false,
+            "bodyHtml": "<p>Agenda:</p><ul><li>Scope</li><li>Risks</li></ul>"
+        },
+        {
+            "id": 5,
+            "mailboxId": "drafts",
+            "from": { "name": "You", "email": "you@example.com" },
+            "to": [{ "name": "Team", "email": "team@example.com" }],
+            "subject": "Draft: Release notes",
+            "preview": "Draft for release notes — feel free to edit...",
+            "timestamp": "2025-11-11T16:45:00.000Z",
+            "isRead": false,
+            "bodyHtml": "<p>Release highlights:</p><ol><li>Feature A</li></ol>"
+        },
+        {
+            "id": 6,
+            "mailboxId": "inbox",
+            "from": { "name": "HR", "email": "hr@example.com" },
+            "to": [{ "name": "You", "email": "you@example.com" }],
+            "subject": "Policy update",
+            "preview": "Please review the updated policy regarding...",
+            "timestamp": "2025-11-10T09:00:00.000Z",
+            "isRead": true,
+            "bodyHtml": "<p>Dear all,</p><p>Policy changes include...</p>"
+        },
+        {
+            "id": 7,
+            "mailboxId": "inbox",
+            "from": { "name": "Marketing", "email": "marketing@example.com" },
+            "to": [{ "name": "You", "email": "you@example.com" }],
+            "subject": "Campaign kickoff",
+            "preview": "Campaign kickoff next Monday — assets attached...",
+            "timestamp": "2025-11-09T11:30:00.000Z",
+            "isRead": false,
+            "bodyHtml": "<p>Team,</p><p>Kickoff details...</p>",
+            "attachments": [
+                { "name": "Campaign_Brief.pdf", "size": "520 KB" },
+                { "name": "Hero_Image.png", "size": "1.8 MB" }
+            ]
+        },
+        {
+            "id": 8,
+            "mailboxId": "sent",
+            "from": { "name": "You", "email": "you@example.com" },
+            "to": [{ "name": "Partner", "email": "partner@example.com" }],
+            "subject": "Contract details",
+            "preview": "Please see the attached contract draft...",
+            "timestamp": "2025-11-08T15:15:00.000Z",
+            "isRead": true,
+            "bodyHtml": "<p>Hello,</p><p>Contract draft attached.</p>",
+            "attachments": [{ "name": "Contract_Draft.docx", "size": "85 KB" }]
+        },
+        {
+            "id": 9,
+            "mailboxId": "trash",
+            "from": { "name": "Old Newsletter", "email": "news@example.com" },
+            "to": [{ "name": "You", "email": "you@example.com" }],
+            "subject": "Weekly digest (old)",
+            "preview": "This is an old newsletter...",
+            "timestamp": "2025-10-01T07:00:00.000Z",
+            "isRead": true,
+            "bodyHtml": "<p>Old content</p>"
+        },
+        {
+            "id": 10,
+            "mailboxId": "inbox",
+            "from": { "name": "DevOps", "email": "devops@example.com" },
+            "to": [{ "name": "You", "email": "you@example.com" }],
+            "subject": "Deploy completed",
+            "preview": "Deployment to staging finished successfully...",
+            "timestamp": "2025-11-16T18:22:00.000Z",
+            "isRead": false,
+            "bodyHtml": "<p>Deploy logs:</p><pre>OK</pre>",
+            "attachments": [{ "name": "deploy-log-2025-11-16.txt", "size": "12 KB" }]
+        },
+        {
+            "id": 11,
+            "mailboxId": "inbox",
+            "from": { "name": "Support", "email": "support@example.com" },
+            "to": [{ "name": "You", "email": "you@example.com" }],
+            "subject": "Ticket #12345 updated",
+            "preview": "We've made progress on your reported issue...",
+            "timestamp": "2025-11-16T12:10:00.000Z",
+            "isRead": false,
+            "bodyHtml": "<p>Update: we've fixed...</p>"
+        },
+        {
+            "id": 12,
+            "mailboxId": "sent",
+            "from": { "name": "You", "email": "you@example.com" },
+            "to": [{ "name": "Vendor", "email": "vendor@example.com" }],
+            "subject": "PO #789 sent",
+            "preview": "Purchase order #789 has been sent...",
+            "timestamp": "2025-11-15T10:00:00.000Z",
+            "isRead": true,
+            "bodyHtml": "<p>PO details...</p>",
+            "attachments": [{ "name": "PO_789.pdf", "size": "48 KB" }]
+        },
+        {
+            "id": 13,
+            "mailboxId": "inbox",
+            "from": { "name": "Jane Le", "email": "jane@example.com" },
+            "to": [{ "name": "You", "email": "you@example.com" }],
+            "subject": "UX feedback",
+            "preview": "Left feedback on the new flow — see comments...",
+            "timestamp": "2025-11-14T09:40:00.000Z",
+            "isRead": true,
+            "bodyHtml": "<p>Feedback summary...</p>"
+        },
+        {
+            "id": 14,
+            "mailboxId": "drafts",
+            "from": { "name": "You", "email": "you@example.com" },
+            "to": [{ "name": "Team Lead", "email": "lead@example.com" }],
+            "subject": "Draft: Roadmap Q1",
+            "preview": "Sharing draft roadmap for Q1 planning...",
+            "timestamp": "2025-11-13T20:00:00.000Z",
+            "isRead": false,
+            "bodyHtml": "<p>Roadmap items...</p>"
+        },
+        {
+            "id": 15,
+            "mailboxId": "inbox",
+            "from": { "name": "Ops", "email": "ops@example.com" },
+            "to": [{ "name": "You", "email": "you@example.com" }],
+            "subject": "Database maintenance",
+            "preview": "Scheduled maintenance this weekend...",
+            "timestamp": "2025-11-12T22:30:00.000Z",
+            "isRead": true,
+            "bodyHtml": "<p>Maintenance details...</p>"
+        },
+        {
+            "id": 16,
+            "mailboxId": "inbox",
+            "from": { "name": "QA", "email": "qa@example.com" },
+            "to": [{ "name": "You", "email": "you@example.com" }],
+            "subject": "Test report summary",
+            "preview": "Test run completed — some failures found...",
+            "timestamp": "2025-11-11T13:55:00.000Z",
+            "isRead": true,
+            "bodyHtml": "<p>Failed cases:</p><ul><li>Case 1</li></ul>"
+        },
+        {
+            "id": 17,
+            "mailboxId": "sent",
+            "from": { "name": "You", "email": "you@example.com" },
+            "to": [{ "name": "Designer", "email": "designer@example.com" }],
+            "subject": "Assets approved",
+            "preview": "I've approved the assets in Figma...",
+            "timestamp": "2025-11-10T09:10:00.000Z",
+            "isRead": true,
+            "bodyHtml": "<p>Thanks, approved.</p>"
+        },
+        {
+            "id": 18,
+            "mailboxId": "inbox",
+            "from": { "name": "Recruiter", "email": "recruiter@example.com" },
+            "to": [{ "name": "You", "email": "you@example.com" }],
+            "subject": "Interview invitation",
+            "preview": "We'd like to invite you for an interview next week...",
+            "timestamp": "2025-11-09T08:00:00.000Z",
+            "isRead": false,
+            "bodyHtml": "<p>Please pick a slot...</p>"
+        },
+        {
+            "id": 19,
+            "mailboxId": "inbox",
+            "from": { "name": "Finance", "email": "finance@example.com" },
+            "to": [{ "name": "You", "email": "you@example.com" }],
+            "subject": "Invoice #555",
+            "preview": "Invoice #555 is now available for payment...",
+            "timestamp": "2025-11-08T17:45:00.000Z",
+            "isRead": true,
+            "bodyHtml": "<p>Invoice details...</p>"
+        },
+        {
+            "id": 20,
+            "mailboxId": "inbox",
+            "from": { "name": "CTO", "email": "cto@example.com" },
+            "to": [{ "name": "You", "email": "you@example.com" }],
+            "subject": "All-hands notes",
+            "preview": "Summary from today's all-hands...",
+            "timestamp": "2025-11-07T12:00:00.000Z",
+            "isRead": true,
+            "bodyHtml": "<p>Notes and actions...</p>"
+        },
+        {
+            "id": 21,
+            "mailboxId": "trash",
+            "from": { "name": "Promo", "email": "promo@example.com" },
+            "to": [{ "name": "You", "email": "you@example.com" }],
+            "subject": "Special offer",
+            "preview": "Limited time offer...",
+            "timestamp": "2025-10-20T07:30:00.000Z",
+            "isRead": true,
+            "bodyHtml": "<p>Promo details</p>"
+        },
+        {
+            "id": 22,
+            "mailboxId": "inbox",
+            "from": { "name": "Stakeholder", "email": "stake@example.com" },
+            "to": [{ "name": "You", "email": "you@example.com" }],
+            "subject": "Meeting follow-up",
+            "preview": "Thanks for meeting — here are the actions...",
+            "timestamp": "2025-11-06T09:30:00.000Z",
+            "isRead": true,
+            "bodyHtml": "<p>Action items...</p>"
+        },
+        {
+            "id": 23,
+            "mailboxId": "inbox",
+            "from": { "name": "External API", "email": "api@example.com" },
+            "to": [{ "name": "You", "email": "you@example.com" }],
+            "subject": "Webhook received",
+            "preview": "We received a webhook event for your app...",
+            "timestamp": "2025-11-05T06:55:00.000Z",
+            "isRead": true,
+            "bodyHtml": "<p>Event payload...</p>"
+        },
+        {
+            "id": 24,
+            "mailboxId": "inbox",
+            "from": { "name": "Scheduler", "email": "scheduler@example.com" },
+            "to": [{ "name": "You", "email": "you@example.com" }],
+            "subject": "Reminder: submit timesheet",
+            "preview": "Don't forget to submit your timesheet by Friday...",
+            "timestamp": "2025-11-04T16:40:00.000Z",
+            "isRead": false,
+            "bodyHtml": "<p>Please submit via the portal...</p>"
+        }
+    ]
+}

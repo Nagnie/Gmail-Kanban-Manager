@@ -1,57 +1,96 @@
-import React, { useState, useEffect } from 'react';
-import { Mail, Star, Send, FileText, Archive, Trash, Plus, RefreshCw, Reply, ReplyAll, Forward, Download, ChevronLeft, Menu, X, Check } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { type Email, type Folder } from '@/services/types';
-import { mockEmails } from '@/services/mockData';
+import React, { useState, useEffect } from "react";
+import {
+    Mail,
+    Star,
+    Send,
+    FileText,
+    Archive,
+    Trash,
+    Plus,
+    RefreshCw,
+    Reply,
+    ReplyAll,
+    Forward,
+    Download,
+    ChevronLeft,
+    Menu,
+    X,
+    Check,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { type Email, type Folder } from "@/services/types";
+import mailApi from "@/services/mailApi";
 
 const folders: Folder[] = [
-    { id: 'inbox', name: 'Inbox', icon: <Mail className="w-4 h-4" />, count: 2 },
-    { id: 'starred', name: 'Starred', icon: <Star className="w-4 h-4" /> },
-    { id: 'sent', name: 'Sent', icon: <Send className="w-4 h-4" /> },
-    { id: 'drafts', name: 'Drafts', icon: <FileText className="w-4 h-4" /> },
-    { id: 'archive', name: 'Archive', icon: <Archive className="w-4 h-4" /> },
-    { id: 'trash', name: 'Trash', icon: <Trash className="w-4 h-4" /> }
+    { id: "inbox", name: "Inbox", icon: <Mail className="w-4 h-4" />, count: 2 },
+    { id: "starred", name: "Starred", icon: <Star className="w-4 h-4" /> },
+    { id: "sent", name: "Sent", icon: <Send className="w-4 h-4" /> },
+    { id: "drafts", name: "Drafts", icon: <FileText className="w-4 h-4" /> },
+    { id: "archive", name: "Archive", icon: <Archive className="w-4 h-4" /> },
+    { id: "trash", name: "Trash", icon: <Trash className="w-4 h-4" /> },
 ];
 
 export default function Dashboard() {
-    const [selectedFolder, setSelectedFolder] = useState('inbox');
+    const [selectedFolder, setSelectedFolder] = useState("inbox");
     const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
-    const [emails, setEmails] = useState<Email[]>(mockEmails.inbox);
+    const [emails, setEmails] = useState<Email[]>([]);
     const [selectedEmailIds, setSelectedEmailIds] = useState<Set<number>>(new Set());
     const [showMobileFolders, setShowMobileFolders] = useState(false);
     const [showMobileDetail, setShowMobileDetail] = useState(false);
     const [composeOpen, setComposeOpen] = useState(false);
 
     useEffect(() => {
-        const folderEmails = mockEmails[selectedFolder] || [];
-        if (selectedFolder === 'starred') {
-            const allEmails = Object.values(mockEmails).flat();
-            setEmails(allEmails.filter(e => e.isStarred));
-        } else {
-            setEmails(folderEmails);
+        let mounted = true;
+        async function load() {
+            setSelectedEmail(null);
+            setSelectedEmailIds(new Set());
+            try {
+                if (selectedFolder === "starred") {
+                    const res = await mailApi.getAllEmails({ page: 1, pageSize: 200 });
+                    if (!mounted) return;
+                    setEmails(res.items.filter((e) => e.isStarred));
+                } else {
+                    const res = await mailApi.getMailboxEmails(selectedFolder, {
+                        page: 1,
+                        pageSize: 200,
+                    });
+                    if (!mounted) return;
+                    setEmails(res.items);
+                }
+            } catch (err) {
+                console.error("Failed to load emails", err);
+            }
         }
-        setSelectedEmail(null);
-        setSelectedEmailIds(new Set());
+        load();
+        return () => {
+            mounted = false;
+        };
     }, [selectedFolder]);
 
-    const handleEmailClick = (email: Email) => {
-        setSelectedEmail(email);
-        setShowMobileDetail(true);
-        if (!email.isRead) {
-            setEmails(emails.map(e => e.id === email.id ? { ...e, isRead: true } : e));
+    const handleEmailClick = async (email: Email) => {
+        try {
+            const detail = await mailApi.getEmailById(email.id);
+            setSelectedEmail(detail);
+            setShowMobileDetail(true);
+            if (!email.isRead) {
+                setEmails(emails.map((e) => (e.id === email.id ? { ...e, isRead: true } : e)));
+            }
+        } catch (err) {
+            console.error("Failed to load email detail", err);
+            // fallback to using the list item
+            setSelectedEmail(email);
+            setShowMobileDetail(true);
         }
     };
 
     const handleToggleStar = (emailId: number) => {
-        setEmails(emails.map(e =>
-            e.id === emailId ? { ...e, isStarred: !e.isStarred } : e
-        ));
+        setEmails(emails.map((e) => (e.id === emailId ? { ...e, isStarred: !e.isStarred } : e)));
         if (selectedEmail?.id === emailId) {
             setSelectedEmail({ ...selectedEmail, isStarred: !selectedEmail.isStarred });
         }
@@ -71,35 +110,50 @@ export default function Dashboard() {
         if (selectedEmailIds.size === emails.length) {
             setSelectedEmailIds(new Set());
         } else {
-            setSelectedEmailIds(new Set(emails.map(e => e.id)));
+            setSelectedEmailIds(new Set(emails.map((e) => e.id)));
         }
     };
 
     const handleMarkAsRead = () => {
-        setEmails(emails.map(e =>
-            selectedEmailIds.has(e.id) ? { ...e, isRead: true } : e
-        ));
+        setEmails(emails.map((e) => (selectedEmailIds.has(e.id) ? { ...e, isRead: true } : e)));
     };
 
     const handleMarkAsUnread = () => {
-        setEmails(emails.map(e =>
-            selectedEmailIds.has(e.id) ? { ...e, isRead: false } : e
-        ));
+        setEmails(emails.map((e) => (selectedEmailIds.has(e.id) ? { ...e, isRead: false } : e)));
         if (selectedEmail) {
             setSelectedEmail({ ...selectedEmail, isRead: false });
         }
     };
 
     const handleDelete = () => {
-        setEmails(emails.filter(e => !selectedEmailIds.has(e.id)));
+        setEmails(emails.filter((e) => !selectedEmailIds.has(e.id)));
         setSelectedEmailIds(new Set());
         if (selectedEmail && selectedEmailIds.has(selectedEmail.id)) {
             setSelectedEmail(null);
         }
     };
 
+    const handleDownloadAttachment = (attachment: { name: string; size?: string }) => {
+        try {
+            const content = `Mock file content for ${attachment.name}\nSize: ${
+                attachment.size || ""
+            }\nGenerated: ${new Date().toISOString()}`;
+            const blob = new Blob([content], { type: "text/plain" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = attachment.name;
+            document.body.appendChild(a);
+            a.click();
+            URL.revokeObjectURL(url);
+            a.remove();
+        } catch (err) {
+            console.error("Download failed", err);
+        }
+    };
+
     const handleKeyDown = (e: React.KeyboardEvent, email: Email) => {
-        if (e.key === 'Enter' || e.key === ' ') {
+        if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             handleEmailClick(email);
         }
@@ -124,11 +178,13 @@ export default function Dashboard() {
 
             <div className="flex-1 flex overflow-hidden">
                 {/* Column 1: Folders */}
-                <aside className={`
-                    ${showMobileFolders ? 'translate-x-0' : '-translate-x-full'}
+                <aside
+                    className={`
+                    ${showMobileFolders ? "translate-x-0" : "-translate-x-full"}
                     lg:translate-x-0 fixed lg:static inset-0 z-40 
                     w-64 lg:w-1/5 border-r transition-transform duration-200
-                    `}>
+                    `}
+                >
                     <div className="h-full flex flex-col bg-sidebar">
                         <div className="p-4 border-b flex items-center justify-between">
                             <h2 className="font-semibold text-2xl">Mailboxes</h2>
@@ -143,7 +199,7 @@ export default function Dashboard() {
                         </div>
                         <ScrollArea className="flex-1">
                             <nav className="p-2">
-                                {folders.map(folder => (
+                                {folders.map((folder) => (
                                     <Button
                                         variant={"ghost"}
                                         key={folder.id}
@@ -154,9 +210,10 @@ export default function Dashboard() {
                                         className={`
                                             w-full flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer
                                             transition-colors text-left
-                                            ${selectedFolder === folder.id
-                                                ? 'bg-mail-selected text-foreground'
-                                                : 'text-muted-foreground'
+                                            ${
+                                                selectedFolder === folder.id
+                                                    ? "bg-mail-selected text-foreground"
+                                                    : "text-muted-foreground"
                                             }
                     `}
                                     >
@@ -175,37 +232,65 @@ export default function Dashboard() {
                 </aside>
 
                 {/* Column 2: Email List */}
-                <div className={`
-                    ${showMobileDetail ? 'hidden lg:flex' : 'flex'}
+                <div
+                    className={`
+                    ${showMobileDetail ? "hidden lg:flex" : "flex"}
                     flex-col w-full lg:w-2/5 border-r
-                    `}>
+                    `}
+                >
                     <div className="p-4 border-b space-y-3">
                         <div className="flex items-center gap-2 flex-wrap">
-                            <Button onClick={() => setComposeOpen(true)} size="sm" className="hidden lg:flex cursor-pointer">
+                            <Button
+                                onClick={() => setComposeOpen(true)}
+                                size="sm"
+                                className="hidden lg:flex cursor-pointer"
+                            >
                                 <Plus className="w-4 h-4 mr-1" />
                                 Compose
                             </Button>
-                            <Button variant="outline" className='cursor-pointer' size="sm" onClick={() => { }}>
+                            <Button
+                                variant="outline"
+                                className="cursor-pointer"
+                                size="sm"
+                                onClick={() => {}}
+                            >
                                 <RefreshCw className="w-4 h-4" />
                             </Button>
                             <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={handleSelectAll}
-                                className='cursor-pointer'
+                                className="cursor-pointer"
                             >
                                 <Check className="w-4 h-4 mr-1" />
-                                {selectedEmailIds.size === emails.length ? 'Deselect' : 'Select All'}
+                                {selectedEmailIds.size === emails.length
+                                    ? "Deselect"
+                                    : "Select All"}
                             </Button>
                             {selectedEmailIds.size > 0 && (
                                 <>
-                                    <Button variant="outline" className='cursor-pointer' size="sm" onClick={handleMarkAsRead}>
+                                    <Button
+                                        variant="outline"
+                                        className="cursor-pointer"
+                                        size="sm"
+                                        onClick={handleMarkAsRead}
+                                    >
                                         Mark Read
                                     </Button>
-                                    <Button variant="outline" className='cursor-pointer' size="sm" onClick={handleMarkAsUnread}>
+                                    <Button
+                                        variant="outline"
+                                        className="cursor-pointer"
+                                        size="sm"
+                                        onClick={handleMarkAsUnread}
+                                    >
                                         Mark Unread
                                     </Button>
-                                    <Button variant="destructive" className='cursor-pointer' size="sm" onClick={handleDelete}>
+                                    <Button
+                                        variant="destructive"
+                                        className="cursor-pointer"
+                                        size="sm"
+                                        onClick={handleDelete}
+                                    >
                                         <Trash className="w-4 h-4" />
                                     </Button>
                                 </>
@@ -221,7 +306,7 @@ export default function Dashboard() {
                                     <p>No emails in this folder</p>
                                 </div>
                             ) : (
-                                emails.map(email => (
+                                emails.map((email) => (
                                     <div
                                         key={email.id}
                                         onClick={() => handleEmailClick(email)}
@@ -231,7 +316,11 @@ export default function Dashboard() {
                                         aria-label={`Email from ${email.from}: ${email.subject}`}
                                         className={`
                                             p-4 cursor-pointer transition-colors
-                                            ${selectedEmail?.id === email.id ? 'bg-mail-selected' : 'hover:bg-sidebar-border'}
+                                            ${
+                                                selectedEmail?.id === email.id
+                                                    ? "bg-mail-selected"
+                                                    : "hover:bg-sidebar-border"
+                                            }
                                         `}
                                     >
                                         <div className="flex items-start gap-3">
@@ -243,14 +332,26 @@ export default function Dashboard() {
                                             />
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2 mb-1">
-                                                    <span className={`flex-1 truncate ${!email.isRead ? 'font-bold text-mail-foreground' : 'font-semibold'}`}>
-                                                        {email.from.split('<')[0].trim()}
+                                                    <span
+                                                        className={`flex-1 truncate ${
+                                                            !email.isRead
+                                                                ? "font-bold text-mail-foreground"
+                                                                : "font-semibold"
+                                                        }`}
+                                                    >
+                                                        {email.from.split("<")[0].trim()}
                                                     </span>
                                                     <span className="text-xs text-muted-foreground whitespace-nowrap">
                                                         {email.timestamp}
                                                     </span>
                                                 </div>
-                                                <div className={`text-sm truncate mb-1 ${!email.isRead ? 'font-bold text-mail-foreground' : ''}`}>
+                                                <div
+                                                    className={`text-sm truncate mb-1 ${
+                                                        !email.isRead
+                                                            ? "font-bold text-mail-foreground"
+                                                            : ""
+                                                    }`}
+                                                >
                                                     {email.subject}
                                                 </div>
                                                 <div className="text-sm text-muted-foreground truncate">
@@ -266,7 +367,11 @@ export default function Dashboard() {
                                                 className="mt-1 cursor-pointer"
                                             >
                                                 <Star
-                                                    className={`w-4 h-4 ${email.isStarred ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground fill-card'}`}
+                                                    className={`w-4 h-4 ${
+                                                        email.isStarred
+                                                            ? "fill-yellow-400 text-yellow-400"
+                                                            : "text-muted-foreground fill-card"
+                                                    }`}
                                                 />
                                             </Button>
                                         </div>
@@ -278,10 +383,12 @@ export default function Dashboard() {
                 </div>
 
                 {/* Column 3: Email Detail */}
-                <div className={`
-                    ${showMobileDetail ? 'flex' : 'hidden lg:flex'}
+                <div
+                    className={`
+                    ${showMobileDetail ? "flex" : "hidden lg:flex"}
                     flex-col w-full lg:w-2/5
-                    `}>
+                    `}
+                >
                     {selectedEmail ? (
                         <>
                             <div className="pt-6 pb-4 px-8">
@@ -295,15 +402,27 @@ export default function Dashboard() {
                                         <ChevronLeft className="w-5 h-5" />
                                     </Button>
                                     <div className="flex gap-3 flex-wrap flex-1">
-                                        <Button variant="ghost" size="sm" className='cursor-pointer' >
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="cursor-pointer"
+                                        >
                                             <Reply className="w-4 h-4 mr-1 text-mail-foreground" />
                                             Reply
                                         </Button>
-                                        <Button variant="ghost" size="sm" className='cursor-pointer' >
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="cursor-pointer"
+                                        >
                                             <ReplyAll className="w-4 h-4 mr-1 text-mail-foreground" />
                                             Reply All
                                         </Button>
-                                        <Button variant="ghost" size="sm" className='cursor-pointer' >
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="cursor-pointer"
+                                        >
                                             <Forward className="w-4 h-4 mr-1 text-mail-foreground" />
                                             Forward
                                         </Button>
@@ -311,15 +430,21 @@ export default function Dashboard() {
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        className='cursor-pointer'
+                                        className="cursor-pointer"
                                         onClick={() => handleToggleStar(selectedEmail.id)}
                                     >
-                                        <Star className={`w-5 h-5 ${selectedEmail.isStarred ? 'fill-yellow-400 text-yellow-400' : ''}`} />
+                                        <Star
+                                            className={`w-5 h-5 ${
+                                                selectedEmail.isStarred
+                                                    ? "fill-yellow-400 text-yellow-400"
+                                                    : ""
+                                            }`}
+                                        />
                                     </Button>
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        className='cursor-pointer'
+                                        className="cursor-pointer"
                                         onClick={handleMarkAsUnread}
                                     >
                                         <Mail className="w-5 h-5" />
@@ -327,7 +452,7 @@ export default function Dashboard() {
                                     <Button
                                         variant="ghost"
                                         size="icon"
-                                        className='cursor-pointer'
+                                        className="cursor-pointer"
                                         onClick={handleDelete}
                                     >
                                         <Trash className="w-5 h-5 text-red-500" />
@@ -337,11 +462,15 @@ export default function Dashboard() {
 
                             <ScrollArea className="flex-1">
                                 <div className="py-4 px-8">
-                                    <h1 className="text-2xl font-bold mb-4">{selectedEmail.subject}</h1>
+                                    <h1 className="text-2xl font-bold mb-4">
+                                        {selectedEmail.subject}
+                                    </h1>
 
                                     <div className="space-y-2 mb-6 text-sm border-b pb-4">
                                         <div className="flex gap-2">
-                                            <span className="text-muted-foreground w-16">From:</span>
+                                            <span className="text-muted-foreground w-16">
+                                                From:
+                                            </span>
                                             <span>{selectedEmail.from}</span>
                                         </div>
                                         <div className="flex gap-2">
@@ -350,12 +479,16 @@ export default function Dashboard() {
                                         </div>
                                         {selectedEmail.cc && (
                                             <div className="flex gap-2">
-                                                <span className="text-muted-foreground w-16">CC:</span>
+                                                <span className="text-muted-foreground w-16">
+                                                    CC:
+                                                </span>
                                                 <span>{selectedEmail.cc}</span>
                                             </div>
                                         )}
                                         <div className="flex gap-2">
-                                            <span className="text-muted-foreground w-16">Date:</span>
+                                            <span className="text-muted-foreground w-16">
+                                                Date:
+                                            </span>
                                             <span>{selectedEmail.timestamp}</span>
                                         </div>
                                     </div>
@@ -364,30 +497,52 @@ export default function Dashboard() {
                                         <p className="whitespace-pre-wrap">{selectedEmail.body}</p>
                                     </div>
 
-                                    {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
-                                        <div className="border-t pt-4">
-                                            <h3 className="font-semibold mb-3">Attachments ({selectedEmail.attachments.length})</h3>
-                                            <div className="space-y-2">
-                                                {selectedEmail.attachments.map((attachment, idx) => (
-                                                    <div
-                                                        key={idx}
-                                                        className="flex items-center justify-between p-3 bg-secondary border rounded-lg"
-                                                    >
-                                                        <div className="flex items-center gap-3">
-                                                            <FileText className="w-5 h-5 text-muted-foreground" />
-                                                            <div>
-                                                                <div className="font-medium">{attachment.name}</div>
-                                                                <div className="text-sm text-muted-foreground">{attachment.size}</div>
+                                    {selectedEmail.attachments &&
+                                        selectedEmail.attachments.length > 0 && (
+                                            <div className="border-t pt-4">
+                                                <h3 className="font-semibold mb-3">
+                                                    Attachments ({selectedEmail.attachments.length})
+                                                </h3>
+                                                <div className="space-y-2">
+                                                    {selectedEmail.attachments.map(
+                                                        (attachment, idx) => (
+                                                            <div
+                                                                key={idx}
+                                                                className="flex items-center justify-between p-3 bg-secondary border rounded-lg"
+                                                            >
+                                                                <div className="flex items-center gap-3">
+                                                                    <FileText className="w-5 h-5 text-muted-foreground" />
+                                                                    <div>
+                                                                        <div className="font-medium">
+                                                                            {attachment.name}
+                                                                        </div>
+                                                                        <div className="text-sm text-muted-foreground">
+                                                                            {attachment.size}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <Button
+                                                                    variant="ghost"
+                                                                    size="sm"
+                                                                    className="cursor-pointer"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleDownloadAttachment(
+                                                                            attachment as {
+                                                                                name: string;
+                                                                                size?: string;
+                                                                            }
+                                                                        );
+                                                                    }}
+                                                                >
+                                                                    <Download className="w-4 h-4" />
+                                                                </Button>
                                                             </div>
-                                                        </div>
-                                                        <Button variant="ghost" size="sm" className='cursor-pointer' >
-                                                            <Download className="w-4 h-4" />
-                                                        </Button>
-                                                    </div>
-                                                ))}
+                                                        )
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                    )}
+                                        )}
                                 </div>
                             </ScrollArea>
                         </>
@@ -413,10 +568,17 @@ export default function Dashboard() {
                         <Input placeholder="Subject" />
                         <Textarea placeholder="Compose your message..." rows={10} />
                         <div className="flex justify-end gap-2">
-                            <Button variant="outline" className='cursor-pointer' onClick={() => setComposeOpen(false)}>
+                            <Button
+                                variant="outline"
+                                className="cursor-pointer"
+                                onClick={() => setComposeOpen(false)}
+                            >
                                 Cancel
                             </Button>
-                            <Button className='cursor-pointer' onClick={() => setComposeOpen(false)}>
+                            <Button
+                                className="cursor-pointer"
+                                onClick={() => setComposeOpen(false)}
+                            >
                                 Send
                             </Button>
                         </div>

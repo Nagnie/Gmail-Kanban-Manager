@@ -34,10 +34,15 @@ export async function getMailboxEmails(
         id: Number(r.id),
         from: `${r.from?.name ?? ""} <${r.from?.email ?? ""}>`,
         to: (r.to || []).map((t: any) => `${t.name} <${t.email}>`).join(", "),
-        cc: r.cc || undefined,
+        cc: Array.isArray(r.cc)
+            ? (r.cc as any[])
+                  .map((t) => (t.name && t.email ? `${t.name} <${t.email}>` : t))
+                  .join(", ")
+            : r.cc || undefined,
         subject: r.subject,
         preview: r.preview,
         body: htmlToText(r.bodyHtml) || r.bodyText || "",
+        bodyHtml: r.bodyHtml || undefined,
         timestamp: r.timestamp,
         isRead: !!r.isRead,
         isStarred: !!r.isStarred,
@@ -58,10 +63,15 @@ export async function getEmailById(id: number): Promise<Email> {
         id: Number(r.id),
         from: `${r.from?.name ?? ""} <${r.from?.email ?? ""}>`,
         to: (r.to || []).map((t: any) => `${t.name} <${t.email}>`).join(", "),
-        cc: r.cc || undefined,
+        cc: Array.isArray(r.cc)
+            ? (r.cc as any[])
+                  .map((t) => (t.name && t.email ? `${t.name} <${t.email}>` : t))
+                  .join(", ")
+            : r.cc || undefined,
         subject: r.subject,
         preview: r.preview,
         body: htmlToText(r.bodyHtml) || r.bodyText || "",
+        bodyHtml: r.bodyHtml || undefined,
         timestamp: r.timestamp,
         isRead: !!r.isRead,
         isStarred: !!r.isStarred,
@@ -92,10 +102,15 @@ export async function getAllEmails(opts?: {
         id: Number(r.id),
         from: `${r.from?.name ?? ""} <${r.from?.email ?? ""}>`,
         to: (r.to || []).map((t: any) => `${t.name} <${t.email}>`).join(", "),
-        cc: r.cc || undefined,
+        cc: Array.isArray(r.cc)
+            ? (r.cc as any[])
+                  .map((t) => (t.name && t.email ? `${t.name} <${t.email}>` : t))
+                  .join(", ")
+            : r.cc || undefined,
         subject: r.subject,
         preview: r.preview,
         body: htmlToText(r.bodyHtml) || r.bodyText || "",
+        bodyHtml: r.bodyHtml || undefined,
         timestamp: r.timestamp,
         isRead: !!r.isRead,
         isStarred: !!r.isStarred,

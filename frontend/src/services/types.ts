@@ -6,6 +6,7 @@ export interface Email {
     subject: string;
     preview: string;
     body: string;
+    bodyHtml?: string;
     timestamp: string;
     isRead: boolean;
     isStarred: boolean;

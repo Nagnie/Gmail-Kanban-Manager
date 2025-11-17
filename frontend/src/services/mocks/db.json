@@ -30,7 +30,8 @@
             "preview": "I reviewed the design and left comments on...",
             "timestamp": "2025-11-14T14:30:00.000Z",
             "isRead": true,
-            "bodyHtml": "<p>Thanks for sharing the design. I suggest we...</p>"
+            "bodyHtml": "<p>Thanks for sharing the design. I suggest we...</p>",
+            "cc": [{ "name": "Design Team", "email": "design@example.com" }]
         },
         {
             "id": 3,
@@ -42,7 +43,8 @@
             "timestamp": "2025-11-13T08:05:00.000Z",
             "isRead": true,
             "bodyHtml": "<p>Dear client,</p><p>Please find attached...</p>",
-            "attachments": [{ "name": "Project_Timeline_v2.pdf", "size": "340 KB" }]
+            "attachments": [{ "name": "Project_Timeline_v2.pdf", "size": "340 KB" }],
+            "cc": [{ "name": "Project Manager", "email": "pm@example.com" }]
         },
         {
             "id": 4,
@@ -50,10 +52,10 @@
             "from": { "name": "Product Team", "email": "product@example.com" },
             "to": [{ "name": "You", "email": "you@example.com" }],
             "subject": "Sprint planning notes",
-            "preview": "Please review sprint scope for next week...",
+            "preview": "Please review sprint scope and priorities for next week...",
             "timestamp": "2025-11-12T10:20:00.000Z",
             "isRead": false,
-            "bodyHtml": "<p>Agenda:</p><ul><li>Scope</li><li>Risks</li></ul>"
+            "bodyHtml": "<h2>Sprint Planning — Week of Nov 17</h2><p>Hi team,</p><p>Below are the proposed scope items for the upcoming sprint. Please review and flag any blockers before the planning meeting:</p><ol><li><strong>Feature: Improved onboarding flow</strong> — finish UX wireframes and backend sign-up integration (owner: Alice)</li><li><strong>Bug fixes: Payment retry logic</strong> — investigate race condition in retry queue (owner: DevOps)</li><li><strong>Infrastructure: Staging auto-deploy</strong> — enable canary deploys for staging for faster validation (owner: Ops)</li></ol><p><strong>Risks:</strong> pending API contract from Payments team; limited QA bandwidth (2 engineers) this week.</p><p>Action items before planning: update acceptance criteria on the feature tickets and confirm API readiness with Payments by EOD Thursday.</p>"
         },
         {
             "id": 5,
@@ -72,10 +74,10 @@
             "from": { "name": "HR", "email": "hr@example.com" },
             "to": [{ "name": "You", "email": "you@example.com" }],
             "subject": "Policy update",
-            "preview": "Please review the updated policy regarding...",
+            "preview": "Updated remote-work and PTO policies — effective next month.",
             "timestamp": "2025-11-10T09:00:00.000Z",
             "isRead": true,
-            "bodyHtml": "<p>Dear all,</p><p>Policy changes include...</p>"
+            "bodyHtml": "<h2>Company Policy Updates</h2><p>Dear colleagues,</p><p>After reviewing feedback and benchmarking with industry peers, we are updating our remote-work and PTO policies effective December 1.</p><h3>Highlights</h3><ul><li><strong>Remote Work:</strong> Employees may work remotely up to 3 days per week with manager approval. Office days are encouraged for collaboration Tuesdays and Thursdays.</li><li><strong>PTO accrual:</strong> Accrual increases after 2 years of service. See the attached matrix for details.</li><li><strong>Parental leave:</strong> Expanded to 16 weeks paid leave for primary caregivers.</li></ul><p>Please review the full policy document attached to this email and submit any questions to HR by November 25. We will host a live Q&A on Nov 27 at 3pm.</p>"
         },
         {
             "id": 7,
@@ -133,10 +135,14 @@
             "from": { "name": "Support", "email": "support@example.com" },
             "to": [{ "name": "You", "email": "you@example.com" }],
             "subject": "Ticket #12345 updated",
-            "preview": "We've made progress on your reported issue...",
+            "preview": "Support update: we've identified the root cause and deployed a hotfix to staging.",
             "timestamp": "2025-11-16T12:10:00.000Z",
             "isRead": false,
-            "bodyHtml": "<p>Update: we've fixed...</p>"
+            "bodyHtml": "<h2>Ticket #12345 — Update</h2><p>Hi,</p><p>Thanks for reporting this issue. Our investigation shows the problem was caused by a deadlock in the order processing worker when high concurrency and a specific payment provider response coincided.</p><p>What we did:</p><ol><li>Reproduced the issue in a staging environment using synthetic traffic.</li><li>Implemented a fix to remove the deadlock by altering the retry lock logic and adding safer backoff.</li><li>Deployed the fix to staging and executed a regression suite.</li></ol><p>Current status: the fix is in staging and tests show the worker remains stable under load. We plan to deploy to production during the next maintenance window (Nov 18, 02:00 UTC) unless you advise otherwise.</p><p>If you can confirm the issue does not occur on your side after the deployment, we'll close the ticket. Thank you for your patience.</p>",
+            "cc": [
+                { "name": "Support Lead", "email": "lead-support@example.com" },
+                { "name": "Team", "email": "team@example.com" }
+            ]
         },
         {
             "id": 12,
@@ -159,7 +165,8 @@
             "preview": "Left feedback on the new flow — see comments...",
             "timestamp": "2025-11-14T09:40:00.000Z",
             "isRead": true,
-            "bodyHtml": "<p>Feedback summary...</p>"
+            "bodyHtml": "<p>Feedback summary...</p>",
+            "cc": [{ "name": "UX Lead", "email": "uxlead@example.com" }]
         },
         {
             "id": 14,
@@ -210,11 +217,11 @@
             "mailboxId": "inbox",
             "from": { "name": "Recruiter", "email": "recruiter@example.com" },
             "to": [{ "name": "You", "email": "you@example.com" }],
-            "subject": "Interview invitation",
-            "preview": "We'd like to invite you for an interview next week...",
+            "subject": "Interview invitation — Senior Frontend Engineer",
+            "preview": "We'd like to invite you to a technical interview for the Senior Frontend Engineer role.",
             "timestamp": "2025-11-09T08:00:00.000Z",
             "isRead": false,
-            "bodyHtml": "<p>Please pick a slot...</p>"
+            "bodyHtml": "<h2>Interview Invitation</h2><p>Hi,</p><p>We reviewed your application and would like to invite you to the next stage: a 60-minute technical interview with the engineering team.</p><p>Format:</p><ul><li>30 minutes: system design discussion focused on scalable frontend architectures and performance optimizations.</li><li>30 minutes: coding exercise (pair-programming) on a React/TypeScript task.</li></ul><p>Please use the link below to choose a slot that works for you. If none of the available times fit, reply with your availability and we'll try to accommodate.</p><p>Best regards,<br/>Recruiting Team</p>"
         },
         {
             "id": 19,
@@ -233,10 +240,10 @@
             "from": { "name": "CTO", "email": "cto@example.com" },
             "to": [{ "name": "You", "email": "you@example.com" }],
             "subject": "All-hands notes",
-            "preview": "Summary from today's all-hands...",
+            "preview": "Summary and action items from today's all-hands meeting.",
             "timestamp": "2025-11-07T12:00:00.000Z",
             "isRead": true,
-            "bodyHtml": "<p>Notes and actions...</p>"
+            "bodyHtml": "<h2>All-hands — Key Highlights</h2><p>Thanks everyone for joining today. Below are the highlights and action items:</p><h3>Highlights</h3><ul><li>We shipped the initial phase of the analytics dashboard to staging.</li><li>Customer success reported a 12% increase in trial-to-paid conversions after the onboarding improvements.</li><li>Q1 planning is underway; managers should submit team goals by Nov 20.</li></ul><h3>Action Items</h3><ol><li>Engineering: finalize the performance improvements for the reports page (owner: Performance Squad).</li><li>Product: prepare customer demo for Dec 2 (owner: Product).</li><li>All teams: add quarterly goals to the company goals doc by Nov 20.</li></ol><p>If you have questions, reply to this thread or attend the office hours session on Friday at 10am.</p>"
         },
         {
             "id": 21,

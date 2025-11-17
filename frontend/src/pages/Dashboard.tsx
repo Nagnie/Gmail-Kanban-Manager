@@ -152,6 +152,14 @@ export default function Dashboard() {
         }
     };
 
+    const sanitizeHtml = (html: string) => {
+        // basic sanitization for mock content: remove script tags and inline event handlers
+        return html
+            .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
+            .replace(/ on\w+="[^"]*"/gi, "")
+            .replace(/ on\w+='[^']*'/gi, "");
+    };
+
     const handleKeyDown = (e: React.KeyboardEvent, email: Email) => {
         if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
@@ -493,9 +501,20 @@ export default function Dashboard() {
                                         </div>
                                     </div>
 
-                                    <div className="prose max-w-none mb-6">
-                                        <p className="whitespace-pre-wrap">{selectedEmail.body}</p>
-                                    </div>
+                                    {selectedEmail.bodyHtml ? (
+                                        <div
+                                            className="prose max-w-none mb-6"
+                                            dangerouslySetInnerHTML={{
+                                                __html: sanitizeHtml(selectedEmail.bodyHtml),
+                                            }}
+                                        />
+                                    ) : (
+                                        <div className="prose max-w-none mb-6">
+                                            <p className="whitespace-pre-wrap">
+                                                {selectedEmail.body}
+                                            </p>
+                                        </div>
+                                    )}
 
                                     {selectedEmail.attachments &&
                                         selectedEmail.attachments.length > 0 && (

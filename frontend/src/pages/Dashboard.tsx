@@ -40,6 +40,9 @@ export default function Dashboard() {
     const [selectedFolder, setSelectedFolder] = useState("inbox");
     const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
     const [emails, setEmails] = useState<Email[]>([]);
+    const [mailboxesState, setMailboxesState] = useState<
+        Array<{ id: string; name: string; unreadCount?: number }>
+    >([]);
     const [selectedEmailIds, setSelectedEmailIds] = useState<Set<number>>(new Set());
     const [showMobileFolders, setShowMobileFolders] = useState(false);
     const [showMobileDetail, setShowMobileDetail] = useState(false);
@@ -55,6 +58,14 @@ export default function Dashboard() {
                     const res = await mailApi.getAllEmails({ page: 1, pageSize: 200 });
                     if (!mounted) return;
                     setEmails(res.items.filter((e) => e.isStarred));
+                    // refresh mailbox counts
+                    try {
+                        const boxes = await mailApi.getMailboxes();
+                        if (!mounted) return;
+                        setMailboxesState(boxes);
+                    } catch (err) {
+                        console.error("Failed to refresh mailboxes", err);
+                    }
                 } else {
                     const res = await mailApi.getMailboxEmails(selectedFolder, {
                         page: 1,
@@ -62,6 +73,14 @@ export default function Dashboard() {
                     });
                     if (!mounted) return;
                     setEmails(res.items);
+                    // refresh mailbox counts
+                    try {
+                        const boxes = await mailApi.getMailboxes();
+                        if (!mounted) return;
+                        setMailboxesState(boxes);
+                    } catch (err) {
+                        console.error("Failed to refresh mailboxes", err);
+                    }
                 }
             } catch (err) {
                 console.error("Failed to load emails", err);
@@ -73,13 +92,40 @@ export default function Dashboard() {
         };
     }, [selectedFolder]);
 
+    // initial load of mailboxes (counts)
+    useEffect(() => {
+        let mounted = true;
+        mailApi
+            .getMailboxes()
+            .then((boxes) => {
+                if (!mounted) return;
+                setMailboxesState(boxes);
+            })
+            .catch((err) => console.error("Failed to load mailboxes", err));
+        return () => {
+            mounted = false;
+        };
+    }, []);
+
     const handleEmailClick = async (email: Email) => {
         try {
             const detail = await mailApi.getEmailById(email.id);
             setSelectedEmail(detail);
             setShowMobileDetail(true);
             if (!email.isRead) {
-                setEmails(emails.map((e) => (e.id === email.id ? { ...e, isRead: true } : e)));
+                // optimistic update
+                setEmails((prev) =>
+                    prev.map((e) => (e.id === email.id ? { ...e, isRead: true } : e))
+                );
+                // adjust mailbox unread count locally
+                setMailboxesState((prev) =>
+                    prev.map((m) =>
+                        m.id === selectedFolder
+                            ? { ...m, unreadCount: Math.max(0, (m.unreadCount || 0) - 1) }
+                            : m
+                    )
+                );
+                // NOTE: intentionally not persisting read state to API to avoid reloads
             }
         } catch (err) {
             console.error("Failed to load email detail", err);
@@ -89,10 +135,25 @@ export default function Dashboard() {
         }
     };
 
-    const handleToggleStar = (emailId: number) => {
-        setEmails(emails.map((e) => (e.id === emailId ? { ...e, isStarred: !e.isStarred } : e)));
+    const handleToggleStar = async (emailId: number) => {
+        const current = emails.find((e) => e.id === emailId) || selectedEmail;
+        const newVal = !(current?.isStarred ?? false);
+        // optimistic update
+        setEmails((prev) => prev.map((e) => (e.id === emailId ? { ...e, isStarred: newVal } : e)));
         if (selectedEmail?.id === emailId) {
-            setSelectedEmail({ ...selectedEmail, isStarred: !selectedEmail.isStarred });
+            setSelectedEmail({ ...selectedEmail, isStarred: newVal });
+        }
+        try {
+            await mailApi.patchEmail(emailId, { isStarred: newVal });
+        } catch (err) {
+            console.error("Failed to toggle star", err);
+            // revert on failure
+            setEmails((prev) =>
+                prev.map((e) => (e.id === emailId ? { ...e, isStarred: !newVal } : e))
+            );
+            if (selectedEmail?.id === emailId) {
+                setSelectedEmail({ ...selectedEmail, isStarred: !newVal });
+            }
         }
     };
 
@@ -115,13 +176,42 @@ export default function Dashboard() {
     };
 
     const handleMarkAsRead = () => {
-        setEmails(emails.map((e) => (selectedEmailIds.has(e.id) ? { ...e, isRead: true } : e)));
+        // optimistic update
+        const affected = emails.filter((e) => selectedEmailIds.has(e.id) && !e.isRead);
+        if (affected.length > 0) {
+            setEmails((prev) =>
+                prev.map((e) => (selectedEmailIds.has(e.id) ? { ...e, isRead: true } : e))
+            );
+            // decrement unread count for current mailbox
+            setMailboxesState((prev) =>
+                prev.map((m) =>
+                    m.id === selectedFolder
+                        ? { ...m, unreadCount: Math.max(0, (m.unreadCount || 0) - affected.length) }
+                        : m
+                )
+            );
+            // NOTE: intentionally not persisting read state to API to avoid reloads
+        }
     };
 
     const handleMarkAsUnread = () => {
-        setEmails(emails.map((e) => (selectedEmailIds.has(e.id) ? { ...e, isRead: false } : e)));
-        if (selectedEmail) {
-            setSelectedEmail({ ...selectedEmail, isRead: false });
+        const affected = emails.filter((e) => selectedEmailIds.has(e.id) && e.isRead);
+        if (affected.length > 0) {
+            setEmails((prev) =>
+                prev.map((e) => (selectedEmailIds.has(e.id) ? { ...e, isRead: false } : e))
+            );
+            if (selectedEmail) {
+                setSelectedEmail({ ...selectedEmail, isRead: false });
+            }
+            // increment unread count for current mailbox
+            setMailboxesState((prev) =>
+                prev.map((m) =>
+                    m.id === selectedFolder
+                        ? { ...m, unreadCount: (m.unreadCount || 0) + affected.length }
+                        : m
+                )
+            );
+            // NOTE: intentionally not persisting read state to API to avoid reloads
         }
     };
 
@@ -159,6 +249,37 @@ export default function Dashboard() {
             .replace(/ on\w+="[^"]*"/gi, "")
             .replace(/ on\w+='[^']*'/gi, "");
     };
+
+    function formatTimestamp(ts?: string, mode: "list" | "detail" = "list") {
+        if (!ts) return "";
+        const d = new Date(ts);
+        if (isNaN(d.getTime())) return ts;
+
+        const now = new Date();
+        const sameDay =
+            d.getFullYear() === now.getFullYear() &&
+            d.getMonth() === now.getMonth() &&
+            d.getDate() === now.getDate();
+
+        if (mode === "list") {
+            // show time if today, else show day/month + time so time is always visible
+            const time = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+            if (sameDay) {
+                return time;
+            }
+            const shortDate = d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+            return `${shortDate} · ${time}`;
+        }
+
+        // detail: full date + time
+        return d.toLocaleString(undefined, {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+        });
+    }
 
     const handleKeyDown = (e: React.KeyboardEvent, email: Email) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -227,11 +348,17 @@ export default function Dashboard() {
                                     >
                                         {folder.icon}
                                         <span className="flex-1">{folder.name}</span>
-                                        {folder.count ? (
-                                            <Badge variant="secondary" className="ml-auto">
-                                                {folder.count}
-                                            </Badge>
-                                        ) : null}
+                                        {(() => {
+                                            const mb = mailboxesState.find(
+                                                (m) => m.id === folder.id
+                                            );
+                                            const count = mb?.unreadCount ?? folder.count;
+                                            return count ? (
+                                                <Badge variant="secondary" className="ml-auto">
+                                                    {count}
+                                                </Badge>
+                                            ) : null;
+                                        })()}
                                     </Button>
                                 ))}
                             </nav>
@@ -349,8 +476,8 @@ export default function Dashboard() {
                                                     >
                                                         {email.from.split("<")[0].trim()}
                                                     </span>
-                                                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                                        {email.timestamp}
+                                                    <span className="text-xs text-muted-foreground whitespace-nowrap w-24 text-right ml-2 shrink-0">
+                                                        {formatTimestamp(email.timestamp, "list")}
                                                     </span>
                                                 </div>
                                                 <div
@@ -497,7 +624,9 @@ export default function Dashboard() {
                                             <span className="text-muted-foreground w-16">
                                                 Date:
                                             </span>
-                                            <span>{selectedEmail.timestamp}</span>
+                                            <span>
+                                                {formatTimestamp(selectedEmail.timestamp, "detail")}
+                                            </span>
                                         </div>
                                     </div>
 

@@ -112,9 +112,16 @@ export async function getAllEmails(opts?: {
     return { items, total };
 }
 
+export async function patchEmail(id: number, patch: Partial<RawEmail>): Promise<Email> {
+    const res = await api.patch<RawEmail>(`/emails/${id}`, patch);
+    const r = res.data as RawEmail;
+    return mapRawToEmail(r);
+}
+
 export default {
     getMailboxes,
     getMailboxEmails,
     getEmailById,
     getAllEmails,
+    patchEmail,
 };

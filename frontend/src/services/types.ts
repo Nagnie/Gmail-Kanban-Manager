@@ -6,10 +6,17 @@ export interface Email {
     subject: string;
     preview: string;
     body: string;
+    bodyHtml?: string;
     timestamp: string;
     isRead: boolean;
     isStarred: boolean;
     attachments?: { name: string; size: string }[];
+}
+
+export interface Mailbox {
+    id: string;
+    name: string;
+    unreadCount?: number;
 }
 
 export interface Folder {

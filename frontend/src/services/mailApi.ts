@@ -78,14 +78,14 @@ export async function getMailboxes(): Promise<
 
 export async function getMailboxEmails(
     mailboxId: string,
-    opts?: { page?: number; pageSize?: number; q?: string }
-): Promise<{ items: Email[]; total: number }> {
+    opts?: { offset?: number; limit?: number; q?: string }
+): Promise<{ items: Email[]; total: number; hasMore: boolean }> {
     try {
         const params: Record<string, string | number | undefined> = {};
-        const page = Math.max(opts?.page ?? 1, 1);
-        const pageSize = Math.min(Math.max(opts?.pageSize ?? 20, 1), 100); // Cap at 100
-        params._page = page;
-        params._limit = pageSize;
+        const offset = Math.max(opts?.offset ?? 0, 0);
+        const limit = Math.min(Math.max(opts?.limit ?? 20, 1), 100); // Cap at 100
+        params._start = offset;
+        params._limit = limit;
         if (opts?.q && opts.q.trim()) {
             params.q = opts.q.trim();
         }
@@ -99,12 +99,12 @@ export async function getMailboxEmails(
             // Filter by starred
             items = items.filter((e) => e.isStarred);
 
-            // Apply pagination on filtered results
+            // Apply offset/limit on filtered results
             const total = items.length;
-            const start = (page - 1) * pageSize;
-            items = items.slice(start, start + pageSize);
+            items = items.slice(offset, offset + limit);
+            const hasMore = offset + limit < total;
 
-            return { items, total };
+            return { items, total, hasMore };
         }
 
         // For regular mailboxes, use mailboxId filter
@@ -115,12 +115,14 @@ export async function getMailboxEmails(
         // Parse total count from headers or calculate from response
         let total = parseInt(res.headers["x-total-count"] || String(items.length), 10);
 
-        // If response is all items and less than pageSize, that's the total
-        if (items.length < pageSize) {
-            total = (page - 1) * pageSize + items.length;
+        // If response is all items and less than limit, calculate total
+        if (items.length < limit) {
+            total = offset + items.length;
         }
 
-        return { items, total };
+        const hasMore = offset + limit < total;
+
+        return { items, total, hasMore };
     } catch (error) {
         const err = error as { message: string };
         console.error(`Error fetching emails from mailbox ${mailboxId}:`, err.message);
@@ -141,16 +143,16 @@ export async function getEmailById(id: number): Promise<Email> {
 }
 
 export async function getAllEmails(opts?: {
-    page?: number;
-    pageSize?: number;
+    offset?: number;
+    limit?: number;
     q?: string;
-}): Promise<{ items: Email[]; total: number }> {
+}): Promise<{ items: Email[]; total: number; hasMore: boolean }> {
     try {
         const params: Record<string, string | number | undefined> = {};
-        const page = Math.max(opts?.page ?? 1, 1);
-        const pageSize = Math.min(Math.max(opts?.pageSize ?? 100, 1), 100); // Cap at 100
-        params._page = page;
-        params._limit = pageSize;
+        const offset = Math.max(opts?.offset ?? 0, 0);
+        const limit = Math.min(Math.max(opts?.limit ?? 100, 1), 100); // Cap at 100
+        params._start = offset;
+        params._limit = limit;
         if (opts?.q && opts.q.trim()) {
             params.q = opts.q.trim();
         }
@@ -159,7 +161,8 @@ export async function getAllEmails(opts?: {
         const raw = Array.isArray(res.data) ? res.data : [];
         const items: Email[] = raw.map(mapRawToEmail);
         const total = parseInt(res.headers["x-total-count"] || String(items.length), 10);
-        return { items, total };
+        const hasMore = offset + limit < total;
+        return { items, total, hasMore };
     } catch (error) {
         const err = error as { message: string };
         console.error("Error fetching all emails:", err.message);

@@ -24,6 +24,7 @@ import { type Email, type Folder } from "@/services/types";
 import mailApi from "@/services/mailApi";
 import { EmailDetail } from "@/components/EmailDetail";
 import { formatDateShort } from "@/lib/utils";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 
 // Icon mapping for mailbox IDs
 const mailboxIcons: Record<string, React.ReactNode> = {
@@ -44,12 +45,42 @@ export default function Dashboard() {
     const [showMobileFolders, setShowMobileFolders] = useState(false);
     const [showMobileDetail, setShowMobileDetail] = useState(false);
     const [composeOpen, setComposeOpen] = useState(false);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [pageSize] = useState(4);
-    const [totalEmails, setTotalEmails] = useState(0);
+    const [offset, setOffset] = useState(0);
+    const [limit] = useState(5);
+    const [hasMore, setHasMore] = useState(true);
     const [searchQuery, setSearchQuery] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [isLoadingDetail, setIsLoadingDetail] = useState(false);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+    const sentinelRef = useInfiniteScroll({
+        hasMore,
+        isLoading: isLoadingMore,
+        onLoadMore: handleLoadMore,
+    });
+
+    function handleLoadMore() {
+        if (!hasMore || isLoadingMore || isLoading) return;
+        setIsLoadingMore(true);
+        const newOffset = offset + limit;
+        const loadMoreEmails = async () => {
+            try {
+                const result = await mailApi.getMailboxEmails(selectedFolder, {
+                    offset: newOffset,
+                    limit: limit,
+                    q: searchQuery,
+                });
+
+                setEmails((prevEmails) => [...prevEmails, ...result.items]);
+                setOffset(newOffset);
+                setHasMore(result.hasMore);
+            } catch (err) {
+                console.error("Error loading more emails:", err);
+            } finally {
+                setIsLoadingMore(false);
+            }
+        };
+        loadMoreEmails();
+    }
 
     // Load mailboxes from API
     useEffect(() => {
@@ -81,40 +112,31 @@ export default function Dashboard() {
         loadMailboxes();
     }, []);
 
-    // Reset current page when folder changes
+    // Reset emails when folder changes
     useEffect(() => {
-        setCurrentPage(1);
+        setEmails([]);
+        setOffset(0);
+        setHasMore(true);
     }, [selectedFolder]);
 
-    // Load emails from API
+    // Load initial emails from API
     useEffect(() => {
         const loadEmails = async () => {
             setIsLoading(true);
             try {
                 const result = await mailApi.getMailboxEmails(selectedFolder, {
-                    page: currentPage,
-                    pageSize: pageSize,
+                    offset: 0,
+                    limit: limit,
                     q: searchQuery,
                 });
 
-                // If API returned more items than pageSize, it means pagination wasn't applied on server
-                // So we need to apply it client-side
-                let items = result.items;
-                let total = result.total;
-
-                if (items.length > pageSize) {
-                    // Server didn't paginate, so paginate client-side
-                    total = items.length;
-                    const start = (currentPage - 1) * pageSize;
-                    items = items.slice(start, start + pageSize);
-                }
-
-                setEmails(items);
-                setTotalEmails(total);
+                setEmails(result.items);
+                setOffset(limit);
+                setHasMore(result.hasMore);
             } catch (err) {
                 console.error("Error loading emails:", err);
                 setEmails([]);
-                setTotalEmails(0);
+                setHasMore(false);
             } finally {
                 setIsLoading(false);
             }
@@ -123,7 +145,7 @@ export default function Dashboard() {
         loadEmails();
         setSelectedEmail(null);
         setSelectedEmailIds(new Set());
-    }, [selectedFolder, currentPage, pageSize, searchQuery]);
+    }, [selectedFolder, searchQuery, limit]);
 
     const handleEmailClick = (email: Email) => {
         setShowMobileDetail(true);
@@ -286,7 +308,6 @@ export default function Dashboard() {
                             value={searchQuery}
                             onChange={(e) => {
                                 setSearchQuery(e.target.value);
-                                setCurrentPage(1); // Reset to first page on search
                             }}
                             className="w-full"
                         />
@@ -304,7 +325,11 @@ export default function Dashboard() {
                                 variant="outline"
                                 className="cursor-pointer"
                                 size="sm"
-                                onClick={() => setCurrentPage(1)}
+                                onClick={() => {
+                                    setEmails([]);
+                                    setOffset(0);
+                                    setHasMore(true);
+                                }}
                                 disabled={isLoading}
                             >
                                 <RefreshCw
@@ -353,160 +378,109 @@ export default function Dashboard() {
                         </div>
                     </div>
 
-                    <ScrollArea className="flex-1">
+                    <ScrollArea className="h-full w-full overflow-auto">
                         <div className="divide-y">
-                            {emails.length === 0 ? (
+                            {emails.length === 0 && !isLoading ? (
                                 <div className="p-8 text-center text-muted-foreground">
                                     <Mail className="w-12 h-12 mx-auto mb-2 opacity-50" />
                                     <p>No emails in this folder</p>
                                 </div>
                             ) : (
-                                emails.map((email) => (
-                                    <div
-                                        key={email.id}
-                                        onClick={() => handleEmailClick(email)}
-                                        onKeyDown={(e) => handleKeyDown(e, email)}
-                                        tabIndex={0}
-                                        role="button"
-                                        aria-label={`Email from ${email.from}: ${email.subject}`}
-                                        className={`
-                                            p-4 cursor-pointer transition-colors
-                                            ${
-                                                selectedEmail?.id === email.id
-                                                    ? "bg-mail-selected"
-                                                    : "hover:bg-sidebar-border"
-                                            }
-                                        `}
-                                    >
-                                        <div className="flex items-start gap-3">
-                                            <Checkbox
-                                                checked={selectedEmailIds.has(email.id)}
-                                                onCheckedChange={() => handleSelectEmail(email.id)}
-                                                onClick={(e) => e.stopPropagation()}
-                                                className="mt-1 bg-card"
-                                            />
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <span
-                                                        className={`flex-1 truncate ${
+                                <>
+                                    {emails.map((email) => (
+                                        <div
+                                            key={email.id}
+                                            onClick={() => handleEmailClick(email)}
+                                            onKeyDown={(e) => handleKeyDown(e, email)}
+                                            tabIndex={0}
+                                            role="button"
+                                            aria-label={`Email from ${email.from}: ${email.subject}`}
+                                            className={`
+                                                p-4 cursor-pointer transition-colors
+                                                ${
+                                                    selectedEmail?.id === email.id
+                                                        ? "bg-mail-selected"
+                                                        : "hover:bg-sidebar-border"
+                                                }
+                                            `}
+                                        >
+                                            <div className="flex items-start gap-3">
+                                                <Checkbox
+                                                    checked={selectedEmailIds.has(email.id)}
+                                                    onCheckedChange={() =>
+                                                        handleSelectEmail(email.id)
+                                                    }
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="mt-1 bg-card"
+                                                />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span
+                                                            className={`flex-1 truncate ${
+                                                                !email.isRead
+                                                                    ? "font-bold text-mail-foreground"
+                                                                    : "font-semibold"
+                                                            }`}
+                                                        >
+                                                            {email.from.split("<")[0].trim()}
+                                                        </span>
+                                                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                                            {formatDateShort(email.timestamp)}
+                                                        </span>
+                                                    </div>
+                                                    <div
+                                                        className={`text-sm truncate mb-1 ${
                                                             !email.isRead
                                                                 ? "font-bold text-mail-foreground"
-                                                                : "font-semibold"
+                                                                : ""
                                                         }`}
                                                     >
-                                                        {email.from.split("<")[0].trim()}
-                                                    </span>
-                                                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                                                        {formatDateShort(email.timestamp)}
-                                                    </span>
+                                                        {email.subject}
+                                                    </div>
+                                                    <div className="text-sm text-muted-foreground">
+                                                        {email.preview}
+                                                    </div>
                                                 </div>
-                                                <div
-                                                    className={`text-sm truncate mb-1 ${
-                                                        !email.isRead
-                                                            ? "font-bold text-mail-foreground"
-                                                            : ""
-                                                    }`}
+                                                <Button
+                                                    variant={"ghost"}
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleToggleStar(email.id);
+                                                    }}
+                                                    className="mt-1 cursor-pointer"
                                                 >
-                                                    {email.subject}
-                                                </div>
-                                                <div className="text-sm text-muted-foreground">
-                                                    {email.preview}
-                                                </div>
+                                                    <Star
+                                                        className={`w-4 h-4 ${
+                                                            email.isStarred
+                                                                ? "fill-yellow-400 text-yellow-400"
+                                                                : "text-muted-foreground fill-card"
+                                                        }`}
+                                                    />
+                                                </Button>
                                             </div>
-                                            <Button
-                                                variant={"ghost"}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleToggleStar(email.id);
-                                                }}
-                                                className="mt-1 cursor-pointer"
-                                            >
-                                                <Star
-                                                    className={`w-4 h-4 ${
-                                                        email.isStarred
-                                                            ? "fill-yellow-400 text-yellow-400"
-                                                            : "text-muted-foreground fill-card"
-                                                    }`}
-                                                />
-                                            </Button>
                                         </div>
+                                    ))}
+                                    <div
+                                        ref={sentinelRef}
+                                        style={{
+                                            height: 32,
+                                        }}
+                                    ></div>
+                                    <div className="p-4 text-center text-muted-foreground">
+                                        {isLoadingMore && (
+                                            <div className="flex items-center justify-center gap-2">
+                                                <Loader2 className="w-4 h-4 animate-spin" />
+                                                <span>Loading more emails...</span>
+                                            </div>
+                                        )}
+                                        {!hasMore && emails.length > 0 && (
+                                            <p className="text-sm">No more emails to load</p>
+                                        )}
                                     </div>
-                                ))
+                                </>
                             )}
                         </div>
                     </ScrollArea>
-
-                    {/* Pagination */}
-                    {totalEmails > pageSize && (
-                        <div className="p-4 border-t flex items-center justify-between bg-sidebar shrink-0">
-                            <div className="text-sm text-muted-foreground">
-                                Showing {Math.min((currentPage - 1) * pageSize + 1, totalEmails)}-
-                                {Math.min(currentPage * pageSize, totalEmails)} of {totalEmails}
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                                    disabled={currentPage === 1 || isLoading}
-                                    className="cursor-pointer"
-                                >
-                                    Previous
-                                </Button>
-                                <div className="flex items-center gap-1">
-                                    {Array.from({ length: Math.ceil(totalEmails / pageSize) }).map(
-                                        (_, idx) => {
-                                            const page = idx + 1;
-                                            if (
-                                                page === 1 ||
-                                                page === Math.ceil(totalEmails / pageSize) ||
-                                                (page >= currentPage - 1 && page <= currentPage + 1)
-                                            ) {
-                                                return (
-                                                    <Button
-                                                        key={page}
-                                                        variant={
-                                                            page === currentPage
-                                                                ? "default"
-                                                                : "outline"
-                                                        }
-                                                        size="sm"
-                                                        onClick={() => setCurrentPage(page)}
-                                                        disabled={isLoading}
-                                                        className="cursor-pointer"
-                                                    >
-                                                        {page}
-                                                    </Button>
-                                                );
-                                            } else if (
-                                                page === currentPage - 2 ||
-                                                page === currentPage + 2
-                                            ) {
-                                                return (
-                                                    <span key={page} className="px-2">
-                                                        ...
-                                                    </span>
-                                                );
-                                            }
-                                            return null;
-                                        }
-                                    )}
-                                </div>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setCurrentPage(currentPage + 1)}
-                                    disabled={
-                                        currentPage >= Math.ceil(totalEmails / pageSize) ||
-                                        isLoading
-                                    }
-                                    className="cursor-pointer"
-                                >
-                                    Next
-                                </Button>
-                            </div>
-                        </div>
-                    )}
                 </div>
 
                 {/* Column 3: Email Detail */}

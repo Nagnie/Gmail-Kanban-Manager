@@ -96,11 +96,11 @@ export const mockAuthAPI = {
         };
     },
 
-    googleExchange: async (googleToken: string) => {
+    googleExchange: async (credential: string) => {
         await delay(1000);
 
-        if (!googleToken) {
-            throw { response: { status: 400, data: { message: "Google Token is invalid" } } };
+        if (!credential) {
+            throw { response: { status: 400, data: { message: "Google credential is invalid" } } };
         }
 
         const googleUser = mockUsers[0];

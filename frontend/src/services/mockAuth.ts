@@ -1,4 +1,4 @@
-import type { LoginFormData } from "../schemas/auth";
+import type { LoginFormData, SignupFormData } from "../schemas/auth";
 
 interface AuthResponse {
   user: {
@@ -60,14 +60,14 @@ export const mockAuthAPI = {
         };
     },
 
-    register: async (data: any) => {
+    register: async (data: SignupFormData) => {
         await delay(DELAY_MS);
 
         if (mockUsers.find((u) => u.email === data.email)) {
             throw {
                 response: {
                 status: 409,
-                data: { message: "Email này đã được sử dụng" },
+                data: { message: "Email has already been used" },
                 },
             };
         }
@@ -126,8 +126,8 @@ export const mockAuthAPI = {
         if (refreshToken === MOCK_REFRESH_TOKEN) {
             return {
                 data: {
-                accessToken: "new-access-token-" + Date.now(),
-                refreshToken: MOCK_REFRESH_TOKEN,
+                    accessToken: "new-access-token-" + Date.now(),
+                    refreshToken: MOCK_REFRESH_TOKEN,
                 },
             };
         }
@@ -142,7 +142,7 @@ export const mockAuthAPI = {
 
     getMe: async () => {
         await delay(DELAY_MS);
-        
+
         return {
             data: {
                 user: mockUsers[0],

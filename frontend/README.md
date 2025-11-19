@@ -91,3 +91,27 @@ export default tseslint.config([
     },
 ]);
 ```
+
+## Token Storage Strategy
+
+### Why refresh token in localStorage?
+
+We store the **refresh token** in `localStorage` for the following reasons:
+
+1. **Persistence**: User remains logged in across browser sessions
+2. **UX**: Seamless experience without frequent re-authentication
+3. **Security Balance**: While localStorage has XSS risk, refresh tokens:
+   - Can be revoked server-side
+   - Have longer expiry (7 days vs 30min for access tokens)
+   - Are rotated on each use (token rotation)
+
+### Why access token in memory only?
+
+The **access token** is stored ONLY in Redux state (in-memory):
+
+1. **Security**: Not vulnerable to XSS theft via localStorage
+2. **Short-lived**: Expires quickly (30 min), limiting attack window
+3. **Auto-refresh**: Seamlessly refreshed using the refresh token
+4. **No persistence needed**: User profile cached in localStorage provides instant UI
+
+This hybrid approach balances security, UX, and modern best practices.

@@ -1,13 +1,8 @@
 import { BrowserRouter as Router, useRoutes } from 'react-router-dom'
-import { Provider } from 'react-redux'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { store } from './store'
 import { routeConfig } from './config/routeConfig.tsx'
-import { ThemeProvider } from "@/components/theme-provider.tsx"
-import { useEffect } from "react";
-import { mockAuthAPI as authAPI } from '@/services/mockAuth'
-
-const queryClient = new QueryClient()
+import { useAppDispatch } from './hooks/redux.ts'
+import { initializeAuth } from './store/authSlice.ts'
+import { useEffect } from 'react'
 
 function AppRoutes() {
     const routes = useRoutes(routeConfig)
@@ -15,26 +10,20 @@ function AppRoutes() {
 }
 
 function App() {
+    const dispatch = useAppDispatch();
+
     useEffect(() => {
-        const token = localStorage.getItem('token')
-        if (token) {
-            authAPI.getMe().catch(() => {
-                localStorage.removeItem('token')
-                window.location.href = '/login'
-            })
-        }
-    }, [])
+        const init = async () => {
+            await dispatch(initializeAuth()); 
+        };
+
+        init();
+    }, [dispatch]);
 
     return (
-        <Provider store={store}>
-            <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-                <QueryClientProvider client={queryClient}>
-                    <Router>
-                        <AppRoutes />
-                    </Router>
-                </QueryClientProvider>
-            </ThemeProvider>
-        </Provider>
+        <Router>
+            <AppRoutes />
+        </Router>
     )
 }
 

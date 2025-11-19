@@ -1,35 +1,30 @@
-import { useEffect, type ReactNode } from 'react'
-import { Navigate } from 'react-router-dom'
-import { mockAuthAPI as authAPI } from '../services/mockAuth'
-import { setUser, logout } from '../store/authSlice'
-import { useAppDispatch, useAppSelector } from '../hooks/redux'
+import { Navigate, useLocation } from 'react-router-dom'
+import { useAppSelector } from '../hooks/redux'
+import type { ReactNode } from 'react';
 
 interface ProtectedRouteProps {
     children: ReactNode
 }
 
 export default function ProtectedRoute({ children }: ProtectedRouteProps) {
-    const dispatch = useAppDispatch()
-    const { token, user } = useAppSelector(state => state.auth)
+    const { accessToken, isInitialized, user } = useAppSelector(state => state.auth);
+    const location = useLocation();
 
-    useEffect(() => {
-        const fetchUser = async () => {
-            if (token && !user) {
-                try {
-                    const response = await authAPI.getMe()
-                    dispatch(setUser(response.data.user))
-                } catch (error) {
-                    dispatch(logout())
-                }
-            }
+    if (!isInitialized) {
+        if (user) {
+            return <>{children}</>;
         }
-
-        fetchUser()
-    }, [token, user, dispatch])
-
-    if (!token) {
-        return <Navigate to="/login" replace />
+        
+        return (
+            <div className="min-h-screen flex items-center justify-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100"></div>
+            </div>
+        );
     }
 
-    return <>{children}</>
+    if (!accessToken) {
+        return <Navigate to="/login" state={{ from: location }} replace />;
+    }
+
+    return <>{children}</>;
 }

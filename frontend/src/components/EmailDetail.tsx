@@ -23,14 +23,16 @@ interface EmailDetailProps {
     onToggleStar: (emailId: number) => void;
     onMarkAsUnread: (email: Email) => void;
     onDelete: (email: Email) => void;
+    onReply: (email: Email) => void;
 }
 
-export function EmailDetail({
+export default function EmailDetail({
     email,
     onBack,
     onToggleStar,
     onMarkAsUnread,
     onDelete,
+    onReply,
 }: EmailDetailProps) {
     const [fullEmail, setFullEmail] = useState<Email | null>(email);
     const [isLoading, setIsLoading] = useState(false);
@@ -81,11 +83,11 @@ export function EmailDetail({
                         </Button>
                     )}
                     <div className="flex gap-3 flex-wrap flex-1">
-                        <Button variant="ghost" size="sm" className="cursor-pointer">
+                        <Button variant="ghost" size="sm" className="cursor-pointer" onClick={() => onReply(fullEmail)}>
                             <Reply className="w-4 h-4 mr-1 text-mail-foreground" />
                             Reply
                         </Button>
-                        <Button variant="ghost" size="sm" className="cursor-pointer">
+                        <Button variant="ghost" size="sm" className="cursor-pointer" onClick={() => onReply(fullEmail)}>
                             <ReplyAll className="w-4 h-4 mr-1 text-mail-foreground" />
                             Reply All
                         </Button>

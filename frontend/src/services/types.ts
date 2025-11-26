@@ -25,3 +25,11 @@ export interface Folder {
     icon: React.ReactNode;
     count?: number;
 }
+
+export interface DraftEmail {
+    id: string;
+    to: string;
+    subject: string;
+    body: string;
+    timestamp: string;
+}

@@ -9,20 +9,18 @@ import {
     Plus,
     RefreshCw,
     Menu,
-    X,
     Check,
     Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
-import { type Email, type Folder } from "@/services/types";
+import { type DraftEmail, type Email, type Folder } from "@/services/types";
 import mailApi from "@/services/mailApi";
-import { EmailDetail } from "@/components/EmailDetail";
+import EmailDetail from "@/components/EmailDetail";
+import EmailCompose from "@/components/EmailCompose";
+import FolderSidebar from "@/components/FolderSidebar";
 import { formatDateShort } from "@/lib/utils";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 
@@ -44,7 +42,6 @@ export default function Dashboard() {
     const [selectedEmailIds, setSelectedEmailIds] = useState<Set<number>>(new Set());
     const [showMobileFolders, setShowMobileFolders] = useState(false);
     const [showMobileDetail, setShowMobileDetail] = useState(false);
-    const [composeOpen, setComposeOpen] = useState(false);
     const [offset, setOffset] = useState(0);
     const [limit] = useState(5);
     const [hasMore, setHasMore] = useState(true);
@@ -57,6 +54,10 @@ export default function Dashboard() {
         isLoading: isLoadingMore,
         onLoadMore: handleLoadMore,
     });
+    // Compose/Draft states
+    const [viewMode, setViewMode] = useState<'email' | 'compose'>('email');
+    const [currentDraft, setCurrentDraft] = useState<DraftEmail | null>(null);
+    const [replyToEmail, setReplyToEmail] = useState<Email | null>(null);
 
     function handleLoadMore() {
         if (!hasMore || isLoadingMore || isLoading) return;
@@ -221,6 +222,25 @@ export default function Dashboard() {
         }
     };
 
+    const handleCompose = () => {
+        setViewMode('compose');
+        setCurrentDraft(null);
+        setReplyToEmail(null);
+        setSelectedEmail(null);
+        setShowMobileDetail(true);
+    };
+
+    const handleReply = (email: Email) => {
+        setViewMode('compose');
+        setReplyToEmail(email);
+        setCurrentDraft(null);
+    };
+
+    const handleSendEmail = (email: { to: string; subject: string; body: string }) => {
+        console.log('Sending email:', email);
+        // Add to sent folder logic here
+    };
+
     return (
         <div className="h-[calc(100vh-64px)] flex flex-col">
             {/* Mobile Header */}
@@ -233,65 +253,20 @@ export default function Dashboard() {
                     <Menu className="w-5 h-5" />
                 </Button>
                 <h1 className="text-lg font-semibold">Email</h1>
-                <Button variant={"default"} onClick={() => setComposeOpen(true)} size="sm">
+                <Button variant={"default"} onClick={handleCompose} size="sm">
                     <Plus className="w-4 h-4" />
                 </Button>
             </div>
 
             <div className="flex-1 flex overflow-hidden">
                 {/* Column 1: Folders */}
-                <aside
-                    className={`
-                    ${showMobileFolders ? "translate-x-0" : "-translate-x-full"}
-                    lg:translate-x-0 fixed lg:static inset-0 z-40 
-                    w-64 lg:w-1/5 border-r transition-transform duration-200
-                    `}
-                >
-                    <div className="h-full flex flex-col bg-sidebar">
-                        <div className="p-4 border-b flex items-center justify-between">
-                            <h2 className="font-semibold text-2xl">Mailboxes</h2>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="lg:hidden"
-                                onClick={() => setShowMobileFolders(false)}
-                            >
-                                <X className="w-5 h-5" />
-                            </Button>
-                        </div>
-                        <ScrollArea className="flex-1">
-                            <nav className="p-2">
-                                {folders.map((folder) => (
-                                    <Button
-                                        variant={"ghost"}
-                                        key={folder.id}
-                                        onClick={() => {
-                                            setSelectedFolder(folder.id);
-                                            setShowMobileFolders(false);
-                                        }}
-                                        className={`
-                                            w-full flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer
-                                            transition-colors text-left
-                                            ${
-                                                selectedFolder === folder.id
-                                                    ? "bg-mail-selected text-foreground"
-                                                    : "text-muted-foreground"
-                                            }
-                    `}
-                                    >
-                                        {folder.icon}
-                                        <span className="flex-1">{folder.name}</span>
-                                        {folder.count ? (
-                                            <Badge variant="secondary" className="ml-auto">
-                                                {folder.count}
-                                            </Badge>
-                                        ) : null}
-                                    </Button>
-                                ))}
-                            </nav>
-                        </ScrollArea>
-                    </div>
-                </aside>
+                <FolderSidebar
+                    folders={folders}
+                    selectedFolder={selectedFolder}
+                    onSelectFolder={(id) => setSelectedFolder(id)}
+                    showMobile={showMobileFolders}
+                    onCloseMobile={() => setShowMobileFolders(false)}
+                />
 
                 {/* Column 2: Email List */}
                 <div
@@ -314,7 +289,7 @@ export default function Dashboard() {
 
                         <div className="flex items-center gap-2 flex-wrap">
                             <Button
-                                onClick={() => setComposeOpen(true)}
+                                onClick={handleCompose}
                                 size="sm"
                                 className="hidden lg:flex cursor-pointer"
                             >
@@ -484,36 +459,39 @@ export default function Dashboard() {
                 </div>
 
                 {/* Column 3: Email Detail */}
-                <div
-                    className={`
-                    ${showMobileDetail ? "flex" : "hidden lg:flex"}
-                    flex-col w-full lg:w-2/5 overflow-hidden
-                    `}
-                >
+                <div className={`${showMobileDetail ? 'flex' : 'hidden lg:flex'} flex-col w-full lg:w-2/5 overflow-hidden`}>
                     {isLoadingDetail ? (
-                        <div className="flex-1 flex items-center justify-center text-muted-foreground">
-                            <div className="text-center">
-                                <Loader2 className="w-12 h-12 mx-auto mb-4 animate-spin opacity-50" />
-                                <p className="text-lg">Loading email...</p>
-                            </div>
+                        <div className="flex-1 flex items-center justify-center">
+                            <Loader2 className="w-12 h-12 animate-spin opacity-50" />
                         </div>
+                    ) : viewMode === 'compose' ? (
+                        <EmailCompose
+                            draft={currentDraft || undefined}
+                            replyTo={replyToEmail || undefined}
+                            onClose={() => {
+                                setViewMode('email');
+                                setShowMobileDetail(false);
+                            }}
+                            onSend={handleSendEmail}
+                        />
                     ) : selectedEmail ? (
                         <EmailDetail
                             email={selectedEmail}
                             onBack={() => setShowMobileDetail(false)}
-                            onToggleStar={handleToggleStar}
+                            onToggleStar={(id) => {
+                                setEmails(emails.map(e => e.id === id ? { ...e, isStarred: !e.isStarred } : e));
+                                setSelectedEmail({ ...selectedEmail, isStarred: !selectedEmail.isStarred });
+                            }}
                             onMarkAsUnread={(email) => {
-                                setEmails(
-                                    emails.map((e) =>
-                                        e.id === email.id ? { ...e, isRead: false } : e
-                                    )
-                                );
+                                setEmails(emails.map(e => e.id === email.id ? { ...e, isRead: false } : e));
                                 setSelectedEmail({ ...email, isRead: false });
                             }}
                             onDelete={(email) => {
-                                setEmails(emails.filter((e) => e.id !== email.id));
+                                setEmails(emails.filter(e => e.id !== email.id));
                                 setSelectedEmail(null);
+                                setShowMobileDetail(false);
                             }}
+                            onReply={handleReply}
                         />
                     ) : (
                         <div className="flex-1 flex items-center justify-center text-muted-foreground">
@@ -526,34 +504,6 @@ export default function Dashboard() {
                 </div>
             </div>
 
-            {/* Compose Dialog */}
-            <Dialog open={composeOpen} onOpenChange={setComposeOpen}>
-                <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>New Message</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                        <Input placeholder="To" />
-                        <Input placeholder="Subject" />
-                        <Textarea placeholder="Compose your message..." rows={10} />
-                        <div className="flex justify-end gap-2">
-                            <Button
-                                variant="outline"
-                                className="cursor-pointer"
-                                onClick={() => setComposeOpen(false)}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                className="cursor-pointer"
-                                onClick={() => setComposeOpen(false)}
-                            >
-                                Send
-                            </Button>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
 
             {/* Mobile Overlay */}
             {showMobileFolders && (

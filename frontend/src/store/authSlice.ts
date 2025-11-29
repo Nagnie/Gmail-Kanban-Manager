@@ -64,6 +64,7 @@ export const googleLogin = createAsyncThunk(
   'auth/googleLogin',
   async (googleToken: string, { rejectWithValue }) => {
     try {
+        console.log('Google Token:', googleToken);
       const response = await authAPI.googleExchange(googleToken);
       return response.data;
     } catch (err: any) {

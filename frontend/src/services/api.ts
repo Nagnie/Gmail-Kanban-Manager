@@ -132,9 +132,8 @@ export const authAPI = {
     register: (userData: SignupData) => 
         mockAuthAPI.register(userData),
     
-    googleExchange: (googleToken: string) => 
-        mockAuthAPI.googleExchange(googleToken),
-    
+    googleExchange: (authCode: string) => 
+        api.post('/auth/google-login', {code: authCode}),
     refreshToken: (refreshToken: string) => 
         mockAuthAPI.refreshToken(refreshToken),
     

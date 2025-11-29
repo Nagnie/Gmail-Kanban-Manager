@@ -1,0 +1,89 @@
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigType } from '@nestjs/config/dist/types/config.type';
+import { JwtService } from '@nestjs/jwt';
+import { OAuth2Client } from 'google-auth-library';
+import { google } from 'googleapis';
+import googleOauthConfig from 'src/config/google-oauth.config';
+import { User } from 'src/user/entities/user.entity';
+import { UserService } from 'src/user/user.service';
+import { encrypt } from 'src/utils/encrypt.util';
+import { compareHashedText } from 'src/utils/hash.util';
+
+@Injectable()
+export class AuthService {
+  private oauth2Client: OAuth2Client;
+
+  constructor(
+    private jwtService: JwtService,
+    private userService: UserService,
+    @Inject(googleOauthConfig.KEY)
+    googleOauthConfiguration: ConfigType<typeof googleOauthConfig>
+  ) {
+    this.oauth2Client = new google.auth.OAuth2(
+      googleOauthConfiguration.clientId,
+      googleOauthConfiguration.clientSecret,
+      googleOauthConfiguration.redirectUri,
+    );
+  }
+
+  async googleLogin(code: string) {
+    try {
+      const { tokens } = await this.oauth2Client.getToken(code);
+
+      this.oauth2Client.setCredentials(tokens);
+      const oauth2 = google.oauth2({ version: 'v2', auth: this.oauth2Client });
+      const { data: googleUser } = await oauth2.userinfo.get();
+
+      if (!googleUser.email) throw new UnauthorizedException('Email not found');
+
+      const encryptedToken = tokens.refresh_token
+        ? ((await encrypt(tokens.refresh_token)) ?? '')
+        : '';
+
+      const user : User= await this.userService.findOrCreateUser(googleUser, encryptedToken);
+
+      const payload = { sub: user.id, email: user.email };
+      const [at, rt] = await Promise.all([
+        this.jwtService.signAsync(payload),
+        this.jwtService.signAsync(payload),
+      ]);
+
+      await this.userService.updateRtHash(user.id, rt);
+
+      return {
+        appAccessToken: at,
+        appRefreshToken: rt,
+        user: { email: user.email, name: user.name },
+      };
+    } catch (error) {
+      console.error(error);
+      throw new UnauthorizedException('Google authentication failed');
+    }
+  }
+
+  async refreshTokens(userId: number, refreshToken: string) {
+    const user: User = await this.userService.findOne(userId);
+
+    const isRtValid = await compareHashedText(refreshToken, user.hashedRefreshToken || '');
+    if (!isRtValid) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    return await this.generateTokens(userId, user.email);
+  }
+
+  async logout(userId: number) {
+    await this.userService.logout(userId);
+  }
+
+  async generateTokens(userId: number, email: string) {
+    const payload = { sub: userId, email };
+
+    const [at, rt] = await Promise.all([
+      this.jwtService.signAsync(payload),
+      this.jwtService.signAsync(payload),
+    ]);
+
+    return { access_token: at, refresh_token: rt };
+  }
+}

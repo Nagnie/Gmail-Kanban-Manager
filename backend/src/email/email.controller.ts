@@ -14,6 +14,7 @@ import { ApiOperation, ApiSecurity } from '@nestjs/swagger';
 import { ModifyEmailDto } from 'src/email/dto/modify-email.dto';
 import { DeleteBatchEmailDto } from 'src/email/dto/delete-batch-email.dto';
 import { SendEmailDto } from 'src/email/dto/send-email.dto';
+import { ReplyEmailDto } from 'src/email/dto/reply-email.dto';
 
 @Controller('emails')
 @UseGuards(AtGuard)
@@ -110,5 +111,20 @@ export class EmailController {
   })
   async sendEmail(@Req() req, @Body() sendDto: SendEmailDto) {
     return this.emailService.sendEmail(req.user.sub, sendDto);
+  }
+
+  @Post(':id/reply')
+  @ApiSecurity('jwt')
+  @ApiOperation({
+    summary: 'Reply or Forward email',
+    description:
+      'Reply to sender, reply all, or forward email with quoted content',
+  })
+  async replyToEmail(
+    @Req() req,
+    @Param('id') emailId: string,
+    @Body() replyDto: ReplyEmailDto,
+  ) {
+    return this.emailService.replyToEmail(req.user.sub, emailId, replyDto);
   }
 }

@@ -2,10 +2,11 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { GmailService } from '../gmail/gmail.service';
 import { parseEmailDetail, hasAttachments } from '../utils/email.util';
 import { gmail_v1 } from 'googleapis';
-import { EmailDetailDto } from 'src/email/dto/email-detail.dto';
-import { ModifyEmailDto } from 'src/email/dto/modify-email.dto';
-import { DeleteBatchEmailDto } from 'src/email/dto/delete-batch-email.dto';
-import { SendEmailDto } from 'src/email/dto/send-email.dto';
+import { EmailDetailDto } from './dto/email-detail.dto';
+import { ModifyEmailDto } from './dto/modify-email.dto';
+import { DeleteBatchEmailDto } from './dto/delete-batch-email.dto';
+import { AttachmentDto, SendEmailDto } from './dto/send-email.dto';
+import { ReplyEmailDto, ReplyType } from './dto/reply-email.dto';
 
 @Injectable()
 export class EmailService {
@@ -148,6 +149,211 @@ export class EmailService {
     const parsedMessage = parseEmailDetail(sentMessage);
 
     return parsedMessage;
+  }
+
+  async replyToEmail(userId: number, emailId: string, replyDto: ReplyEmailDto) {
+    const originalMessage = await this.getEmailDetail(userId, emailId);
+    if (!originalMessage) {
+      throw new BadRequestException('Original email not found');
+    }
+
+    // Build reply message
+    const sendDto = this.buildReplyMessage(originalMessage, replyDto);
+
+    // Send via existing send method
+    return this.sendEmail(userId, sendDto);
+  }
+
+  private buildReplyMessage(
+    originalMessage: EmailDetailDto,
+    replyDto: ReplyEmailDto,
+  ) {
+    const headers = originalMessage.headers;
+
+    const originalFrom = headers.from;
+    const originalTo = headers.to;
+    const originalCc = headers.cc;
+    const originalSubject = headers.subject || '';
+    const originalDate = headers.date || '';
+
+    const {
+      body: { htmlBody, textBody, attachments: originalAttachments },
+    } = originalMessage;
+
+    let to: string[] = [];
+    let cc: string[] = [];
+    let bcc: string[] = [];
+    let subject: string;
+
+    const originalToList = this.parseEmailAddresses(originalTo);
+
+    switch (replyDto.type) {
+      case ReplyType.REPLY:
+        // Reply to sender only
+        to = this.parseEmailAddresses(originalFrom);
+
+        // Add BCC from replyDto
+        bcc = replyDto.bcc || [];
+
+        subject = this.buildReplySubject(originalSubject);
+        break;
+      case ReplyType.REPLY_ALL:
+        // Reply to sender + all recipients
+        to = this.parseEmailAddresses(originalFrom);
+
+        // Add original To recipients
+        to.push(...originalToList);
+
+        // Add original Cc recipients
+        if (originalCc) {
+          cc = this.parseEmailAddresses(originalCc);
+        }
+
+        // Add additional recipients from replyDto
+        if (replyDto.to) {
+          to.push(...replyDto.to);
+        }
+        if (replyDto.cc) {
+          cc.push(...replyDto.cc);
+        }
+
+        // Add BCC from replyDto
+        bcc = replyDto.bcc || [];
+
+        // Remove duplicates
+        to = [...new Set(to)];
+        cc = [...new Set(cc)];
+
+        subject = this.buildReplySubject(originalSubject);
+        break;
+
+      case ReplyType.FORWARD:
+        // Forward requires recipients from replyDto
+        to = replyDto.to!;
+        cc = replyDto.cc || [];
+        bcc = replyDto.bcc || [];
+
+        subject = replyDto.subject || this.buildForwardSubject(originalSubject);
+        break;
+    }
+
+    // Build quoted content
+    const quotedTextBody = this.buildQuotedText(
+      textBody || htmlBody || '',
+      originalFrom,
+      originalDate,
+    );
+
+    const quotedHtmlBody = this.buildQuotedHtml(
+      htmlBody || textBody || '',
+      originalFrom,
+      originalDate,
+    );
+
+    // Combine reply body with quoted content
+    const finalTextBody = replyDto.textBody
+      ? `${replyDto.textBody}\n\n${quotedTextBody}`
+      : quotedTextBody;
+
+    const finalHtmlBody = replyDto.htmlBody
+      ? `<div>${replyDto.htmlBody}</div><br>${quotedHtmlBody}`
+      : quotedHtmlBody;
+
+    // Handle attachments
+    const allAttachments: AttachmentDto[] = [];
+
+    if (replyDto.includeOriginalAttachments) {
+      const attachments = originalAttachments.map((att) => ({
+        filename: att.filename,
+        mimeType: att.mimeType,
+        data: att.inlineData!,
+      }));
+      allAttachments.push(...attachments);
+    }
+
+    // Add new attachments from replyDto
+    if (replyDto.newAttachments && replyDto.newAttachments.length > 0) {
+      allAttachments.push(...replyDto.newAttachments);
+    }
+
+    return {
+      to,
+      cc: cc.length > 0 ? cc : undefined,
+      bcc: bcc.length > 0 ? bcc : undefined,
+      subject,
+      textBody: finalTextBody,
+      htmlBody: finalHtmlBody,
+      threadId: originalMessage.threadId,
+      attachments: allAttachments.length > 0 ? allAttachments : undefined,
+    };
+  }
+
+  private parseEmailAddresses(headerValue: string): string[] {
+    if (!headerValue) return [];
+
+    // Simple regex to extract emails
+    const emailRegex = /[\w.-]+@[\w.-]+\.\w+/g;
+    const matches = headerValue.match(emailRegex);
+
+    return matches || [];
+  }
+
+  private buildReplySubject(originalSubject: string): string {
+    if (!originalSubject) return 'Re: ';
+
+    const subject = originalSubject.trim();
+
+    // Check if already has Re: prefix
+    if (/^re:/i.test(subject)) {
+      return subject;
+    }
+
+    return `Re: ${subject}`;
+  }
+
+  private buildForwardSubject(originalSubject: string): string {
+    const subject = originalSubject?.trim() || '';
+    return `Fwd: ${subject}`;
+  }
+
+  private buildQuotedText(
+    originalBody: string,
+    from: string,
+    date: string,
+  ): string {
+    const lines = ['', `On ${date}, ${from} wrote:`, ''];
+
+    // Add > prefix to each line
+    const quotedLines = originalBody.split('\n').map((line) => `> ${line}`);
+    lines.push(...quotedLines);
+
+    return lines.join('\n');
+  }
+
+  private buildQuotedHtml(
+    originalBody: string,
+    from: string,
+    date: string,
+  ): string {
+    return `
+      <div class="gmail_quote">
+        <div class="gmail_attr">
+          On ${this.escapeHtml(date)}, ${this.escapeHtml(from)} wrote:
+        </div>
+        <blockquote class="gmail_quote" style="margin:0 0 0 .8ex;border-left:1px #ccc solid;padding-left:1ex">
+          ${originalBody}
+        </blockquote>
+      </div>
+    `;
+  }
+
+  private escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 
   private buildRFC822Message(sendDto: SendEmailDto): string {

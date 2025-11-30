@@ -1,5 +1,13 @@
 /* eslint-disable @typescript-eslint/require-await */
-import { Body, Controller, Inject, Post, Req, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Inject,
+  Post,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RtGuard } from './guards/rt.guard';
 import { ConfigType } from '@nestjs/config';
@@ -18,21 +26,24 @@ export class AuthController {
   }
 
   @Post('google-login')
-  async googleLogin(@Body('code') code: string, @Res({ passthrough: true }) res: Response) {
+  async googleLogin(
+    @Body('code') code: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     console.log(code);
     const data = await this.authService.googleLogin(code);
 
     res.cookie('refresh_token', data.appRefreshToken, {
       httpOnly: true,
       sameSite: 'lax',
-      maxAge: this.jwtRefreshExpiration 
+      maxAge: this.jwtRefreshExpiration,
     });
 
     console.log(data.appAccessToken);
 
     return {
       accessToken: data.appAccessToken,
-      user: data.user
+      user: data.user,
     };
   }
 
@@ -41,6 +52,10 @@ export class AuthController {
   async refreshTokens(@Req() req, @Res({ passthrough: true }) res: Response) {
     const userId: number = req.user['sub'];
     const refreshToken: string = req.user['refreshToken'];
+    console.log(
+      '🚀 ~ AuthController ~ refreshTokens ~ refreshToken:',
+      refreshToken,
+    );
 
     const tokens = await this.authService.refreshTokens(userId, refreshToken);
 
@@ -55,10 +70,10 @@ export class AuthController {
 
   @Post('logout')
   async logout(@Req() req, @Res({ passthrough: true }) res: Response) {
-      res.clearCookie('refresh_token');
-      const userId: number = req.user['sub'];
-      await this.authService.logout(userId);
+    res.clearCookie('refresh_token');
+    const userId: number = req.user['sub'];
+    await this.authService.logout(userId);
 
-      return { message: 'Logged out successfully' };
+    return { message: 'Logged out successfully' };
   }
 }

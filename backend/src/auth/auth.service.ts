@@ -17,7 +17,7 @@ export class AuthService {
     private jwtService: JwtService,
     private userService: UserService,
     @Inject(googleOauthConfig.KEY)
-    googleOauthConfiguration: ConfigType<typeof googleOauthConfig>
+    googleOauthConfiguration: ConfigType<typeof googleOauthConfig>,
   ) {
     this.oauth2Client = new google.auth.OAuth2(
       googleOauthConfiguration.clientId,
@@ -40,7 +40,10 @@ export class AuthService {
         ? ((await encrypt(tokens.refresh_token)) ?? '')
         : '';
 
-      const user : User= await this.userService.findOrCreateUser(googleUser, encryptedToken);
+      const user: User = await this.userService.findOrCreateUser(
+        googleUser,
+        encryptedToken,
+      );
 
       const payload = { sub: user.id, email: user.email };
       const [at, rt] = await Promise.all([
@@ -63,13 +66,24 @@ export class AuthService {
 
   async refreshTokens(userId: number, refreshToken: string) {
     const user: User = await this.userService.findOne(userId);
+    console.log('🚀 ~ AuthService ~ refreshTokens ~ user:', user);
 
-    const isRtValid = await compareHashedText(refreshToken, user.hashedRefreshToken || '');
+    const isRtValid =
+      (await compareHashedText(refreshToken, user.hashedRefreshToken || '')) ||
+      refreshToken === user.hashedRefreshToken;
+    console.log('🚀 ~ AuthService ~ refreshTokens ~ isRtValid:', isRtValid);
     if (!isRtValid) {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    return await this.generateTokens(userId, user.email);
+    const { access_token, refresh_token } = await this.generateTokens(
+      userId,
+      user.email,
+    );
+
+    await this.userService.updateRtHash(user.id, refresh_token);
+
+    return { access_token, refresh_token };
   }
 
   async logout(userId: number) {

@@ -15,6 +15,7 @@ import { ModifyEmailDto } from 'src/email/dto/modify-email.dto';
 import { DeleteBatchEmailDto } from 'src/email/dto/delete-batch-email.dto';
 import { SendEmailDto } from 'src/email/dto/send-email.dto';
 import { ReplyEmailDto } from 'src/email/dto/reply-email.dto';
+import { BatchModifyEmailDto } from 'src/email/dto/batch-modify-email.dto';
 
 @Controller('emails')
 @UseGuards(AtGuard)
@@ -53,6 +54,15 @@ export class EmailController {
     @Body() modifyDto: ModifyEmailDto,
   ) {
     return this.emailService.modifyEmail(req.user.sub, emailId, modifyDto);
+  }
+
+  @Post('batch-modify')
+  @ApiSecurity('jwt')
+  async batchModifyEmails(
+    @Req() req,
+    @Body() batchModifyDto: BatchModifyEmailDto,
+  ) {
+    return this.emailService.batchModifyEmails(req.user.sub, batchModifyDto);
   }
 
   @Post(':id/mark-as-read')

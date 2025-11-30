@@ -7,6 +7,7 @@ import { ModifyEmailDto } from './dto/modify-email.dto';
 import { DeleteBatchEmailDto } from './dto/delete-batch-email.dto';
 import { AttachmentDto, SendEmailDto } from './dto/send-email.dto';
 import { ReplyEmailDto, ReplyType } from './dto/reply-email.dto';
+import { BatchModifyEmailDto } from 'src/email/dto/batch-modify-email.dto';
 
 @Injectable()
 export class EmailService {
@@ -48,6 +49,21 @@ export class EmailService {
     const parsedMessage = parseEmailDetail(modifiedMessage);
 
     return parsedMessage;
+  }
+
+  async batchModifyEmails(userId: number, batchModifyDto: BatchModifyEmailDto) {
+    const requestBody: gmail_v1.Schema$BatchModifyMessagesRequest = {
+      ids: batchModifyDto.ids,
+      addLabelIds: batchModifyDto.addLabelIds,
+      removeLabelIds: batchModifyDto.removeLabelIds,
+    };
+
+    const response = await this.gmailService.batchModifyMessages(
+      userId,
+      requestBody,
+    );
+
+    return response;
   }
 
   async markAsRead(userId: number, emailId: string): Promise<EmailDetailDto> {

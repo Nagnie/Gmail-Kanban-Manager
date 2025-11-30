@@ -127,6 +127,21 @@ export class GmailService {
     return res.data;
   }
 
+  async batchModifyMessages(
+    userId: number,
+    requestBody: gmail_v1.Schema$BatchModifyMessagesRequest,
+  ) {
+    const gmail = await this.getAuthenticatedGmailClient(userId);
+    const res = await gmail.users.messages.batchModify({
+      userId: 'me',
+      requestBody: {
+        ...requestBody,
+      },
+    });
+
+    return res.data;
+  }
+
   async moveMessageToTrash(userId: number, messageId: string) {
     const gmail = await this.getAuthenticatedGmailClient(userId);
     const res = await gmail.users.messages.trash({

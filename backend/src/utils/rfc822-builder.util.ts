@@ -47,6 +47,17 @@ function addEmailHeaders(lines: string[], sendDto: SendEmailDto): void {
   }
 
   lines.push(`Subject: ${sendDto.subject}`);
+
+  // Add threading headers for reply/forward emails
+  // These headers ensure Gmail properly threads the conversation
+  if (sendDto.threadingHeaders) {
+    if (sendDto.threadingHeaders.inReplyTo) {
+      lines.push(`In-Reply-To: ${sendDto.threadingHeaders.inReplyTo}`);
+    }
+    if (sendDto.threadingHeaders.references) {
+      lines.push(`References: ${sendDto.threadingHeaders.references}`);
+    }
+  }
 }
 
 function buildMultipartMixed(

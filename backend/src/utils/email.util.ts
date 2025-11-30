@@ -27,6 +27,9 @@ export function parseEmailDetail(
       bcc: getHeaderValue(headers, 'Bcc') || undefined,
       date: getHeaderValue(headers, 'Date') || '',
       replyTo: getHeaderValue(headers, 'Reply-To') || undefined,
+      messageId: getHeaderValue(headers, 'Message-ID') || undefined,
+      references: getHeaderValue(headers, 'References') || undefined,
+      inReplyTo: getHeaderValue(headers, 'In-Reply-To') || undefined,
     },
 
     body: {

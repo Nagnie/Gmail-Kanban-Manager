@@ -207,6 +207,9 @@ export class EmailService {
     const originalCc = headers?.cc || '';
     const originalSubject = headers?.subject || '';
     const originalDate = headers?.date || '';
+    const originalMessageId = headers?.messageId || '';
+    const originalReferences = headers?.references || '';
+    const originalInReplyTo = headers?.inReplyTo || '';
 
     const {
       body: { htmlBody, textBody, attachments: originalAttachments = [] },
@@ -314,6 +317,14 @@ export class EmailService {
       allAttachments.push(...replyDto.newAttachments);
     }
 
+    // Build threading headers for proper Gmail threading
+    const threadingHeaders = this.buildThreadingHeaders(
+      originalMessageId,
+      originalReferences,
+      originalInReplyTo,
+      replyDto.type,
+    );
+
     return {
       to,
       cc: cc.length > 0 ? cc : undefined,
@@ -323,6 +334,7 @@ export class EmailService {
       htmlBody: finalHtmlBody,
       threadId: originalMessage.threadId,
       attachments: allAttachments.length > 0 ? allAttachments : undefined,
+      threadingHeaders,
     };
   }
 
@@ -336,6 +348,52 @@ export class EmailService {
 
   private buildForwardSubject(originalSubject: string): string {
     return buildForwardSubject(originalSubject);
+  }
+
+  private buildThreadingHeaders(
+    originalMessageId: string,
+    originalReferences: string,
+    originalInReplyTo: string,
+    replyType: ReplyType,
+  ) {
+    // Forward doesn't need threading headers
+    if (replyType === ReplyType.FORWARD) {
+      return undefined;
+    }
+
+    // For reply/reply-all, we need to build proper threading headers
+    // according to RFC 2822 section A.2
+
+    const threadingHeaders: any = {};
+
+    // In-Reply-To should be the Message-ID of the email we're replying to
+    if (originalMessageId) {
+      threadingHeaders.inReplyTo = originalMessageId;
+    }
+
+    // References should contain all previous Message-IDs in the conversation
+    // Build from: existing references + original message ID
+    let referencesList: string[] = [];
+
+    if (originalReferences) {
+      // Parse existing references (space-separated or comma-separated)
+      referencesList = originalReferences
+        .split(/\s+/)
+        .filter((ref) => ref.length > 0);
+    }
+
+    // Add the Message-ID we're replying to if not already present
+    if (originalMessageId && !referencesList.includes(originalMessageId)) {
+      referencesList.push(originalMessageId);
+    }
+
+    if (referencesList.length > 0) {
+      threadingHeaders.references = referencesList.join(' ');
+    }
+
+    return Object.keys(threadingHeaders).length > 0
+      ? threadingHeaders
+      : undefined;
   }
 
   hasAttachments(payload: gmail_v1.Schema$MessagePart) {

@@ -12,6 +12,24 @@ export class EmailRecipientDto {
   name?: string;
 }
 
+export class ThreadingHeadersDto {
+  @ApiPropertyOptional({
+    description: 'Message-ID of the original email being replied to',
+    example: '<abc123@gmail.com>',
+  })
+  @IsOptional()
+  @IsString()
+  inReplyTo?: string;
+
+  @ApiPropertyOptional({
+    description: 'References header containing all Message-IDs in the thread',
+    example: '<abc123@gmail.com> <def456@gmail.com>',
+  })
+  @IsOptional()
+  @IsString()
+  references?: string;
+}
+
 export class SendEmailDto {
   @ApiProperty({
     description: 'Recipients (To)',
@@ -75,6 +93,13 @@ export class SendEmailDto {
   @IsOptional()
   @IsArray()
   attachments?: AttachmentDto[];
+
+  @ApiPropertyOptional({
+    description: 'Threading headers for proper email threading in Gmail',
+    type: ThreadingHeadersDto,
+  })
+  @IsOptional()
+  threadingHeaders?: ThreadingHeadersDto;
 }
 
 export class AttachmentDto {

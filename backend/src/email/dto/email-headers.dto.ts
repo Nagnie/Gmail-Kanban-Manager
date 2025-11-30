@@ -6,4 +6,7 @@ export class EmailHeadersDto {
   bcc?: string;
   date: string;
   replyTo?: string;
+  messageId?: string;
+  references?: string;
+  inReplyTo?: string;
 }

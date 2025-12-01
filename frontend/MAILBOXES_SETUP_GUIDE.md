@@ -1,0 +1,45 @@
+/\*\*
+
+-   EXAMPLE: Cách sử dụng Mailboxes API
+-
+-   1. Trong component, sử dụng hook useMailboxes:
+-
+-   import { useMailboxes } from "@/hooks/useMailboxes";
+-
+-   export function MailboxList() {
+-   const { mailboxes, isLoading, error, refresh } = useMailboxes();
+-
+-   if (isLoading) return <div>Loading...</div>;
+-   if (error) return <div>Error loading mailboxes</div>;
+-
+-   return (
+-       <div>
+-         <button onClick={refresh}>Refresh Mailboxes</button>
+-         <ul>
+-           {mailboxes.map((mailbox) => (
+-             <li key={mailbox.id}>
+-               {mailbox.name} ({mailbox.messagesUnread} unread)
+-             </li>
+-           ))}
+-         </ul>
+-       </div>
+-   );
+-   }
+-
+-
+-   2. Hoặc sử dụng query hook trực tiếp (RTK Query):
+-
+-   import { useGetMailboxesQuery } from "@/services/mailboxes";
+-
+-   export function MailboxesComponent() {
+-   const { data: mailboxes, isLoading, error } = useGetMailboxesQuery();
+-   // ...
+-   }
+-
+-
+-   CACHING BEHAVIOR:
+-   -   Default cache time: 5 minutes
+-   -   Data sẽ được cache tự động
+-   -   Khi component unmount và remount trong 5 phút, data vẫn sẽ được lấy từ cache
+-   -   Có thể refresh manually bằng hàm refresh() hoặc refetch()
+        \*/

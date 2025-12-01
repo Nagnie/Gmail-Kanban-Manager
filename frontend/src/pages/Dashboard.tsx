@@ -22,8 +22,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { type Email, type Folder } from "@/services/mail";
 import { mailApi } from "@/services/mail";
+import { useMailboxes } from "@/hooks/useMailboxes";
 import { EmailDetail } from "@/components/EmailDetail";
-import { formatDateShort } from "@/lib/utils";
+import { formatDateShort, formatMailboxName } from "@/lib/utils";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 
 // Icon mapping for mailbox IDs
@@ -37,8 +38,14 @@ const mailboxIcons: Record<string, React.ReactNode> = {
 };
 
 export default function Dashboard() {
+    const {
+        mailboxes,
+        isLoading: isLoadingMailboxes,
+        error: mailboxesError,
+        refetch: refetchMailboxes,
+    } = useMailboxes();
     const [folders, setFolders] = useState<Folder[]>([]);
-    const [selectedFolder, setSelectedFolder] = useState("inbox");
+    const [selectedFolder, setSelectedFolder] = useState("INBOX");
     const [selectedEmail, setSelectedEmail] = useState<Email | null>(null);
     const [emails, setEmails] = useState<Email[]>([]);
     const [selectedEmailIds, setSelectedEmailIds] = useState<Set<number>>(new Set());
@@ -82,35 +89,26 @@ export default function Dashboard() {
         loadMoreEmails();
     }
 
-    // Load mailboxes from API
+    // Load mailboxes from RTK Query API
     useEffect(() => {
-        const loadMailboxes = async () => {
-            try {
-                const mailboxes = await mailApi.getMailboxes();
-                const foldersData: Folder[] = mailboxes.map((mailbox) => ({
+        if (mailboxes && mailboxes.length > 0) {
+            const foldersData: Folder[] = mailboxes
+                .filter(
+                    (mailbox) =>
+                        !mailbox.id.startsWith("CATEGORY_") &&
+                        !mailbox.id.startsWith("YELLOW_") &&
+                        !mailbox.id.startsWith("CHAT") &&
+                        !mailbox.id.startsWith("DRAFT")
+                )
+                .map((mailbox) => ({
                     id: mailbox.id,
-                    name: mailbox.name,
-                    icon: mailboxIcons[mailbox.id] || <Mail className="w-4 h-4" />,
-                    count: mailbox.unreadCount || 0,
+                    name: formatMailboxName(mailbox.name),
+                    icon: mailboxIcons[mailbox.id.toLowerCase()] || <Mail className="w-4 h-4" />,
+                    count: mailbox.messagesUnread || 0,
                 }));
-                setFolders(foldersData);
-            } catch (error) {
-                console.error("Error loading mailboxes:", error);
-                // Fallback to default folders if API fails
-                const defaultFolders: Folder[] = [
-                    { id: "inbox", name: "Inbox", icon: mailboxIcons["inbox"], count: 0 },
-                    { id: "starred", name: "Starred", icon: mailboxIcons["starred"] },
-                    { id: "sent", name: "Sent", icon: mailboxIcons["sent"] },
-                    { id: "drafts", name: "Drafts", icon: mailboxIcons["drafts"] },
-                    { id: "archive", name: "Archive", icon: mailboxIcons["archive"] },
-                    { id: "trash", name: "Trash", icon: mailboxIcons["trash"] },
-                ];
-                setFolders(defaultFolders);
-            }
-        };
-
-        loadMailboxes();
-    }, []);
+            setFolders(foldersData);
+        }
+    }, [mailboxes]);
 
     // Reset emails when folder changes
     useEffect(() => {
@@ -260,35 +258,72 @@ export default function Dashboard() {
                             </Button>
                         </div>
                         <ScrollArea className="flex-1">
-                            <nav className="p-2">
-                                {folders.map((folder) => (
-                                    <Button
-                                        variant={"ghost"}
-                                        key={folder.id}
-                                        onClick={() => {
-                                            setSelectedFolder(folder.id);
-                                            setShowMobileFolders(false);
-                                        }}
-                                        className={`
-                                            w-full flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer
-                                            transition-colors text-left
-                                            ${
-                                                selectedFolder === folder.id
-                                                    ? "bg-mail-selected text-foreground"
-                                                    : "text-muted-foreground"
-                                            }
-                    `}
-                                    >
-                                        {folder.icon}
-                                        <span className="flex-1">{folder.name}</span>
-                                        {folder.count ? (
-                                            <Badge variant="secondary" className="ml-auto">
-                                                {folder.count}
-                                            </Badge>
-                                        ) : null}
-                                    </Button>
-                                ))}
-                            </nav>
+                            {isLoadingMailboxes ? (
+                                <div className="p-4 flex flex-col items-center justify-center gap-2">
+                                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                                    <p className="text-sm text-muted-foreground">
+                                        Loading mailboxes...
+                                    </p>
+                                </div>
+                            ) : mailboxesError ? (
+                                <div className="p-4">
+                                    <div className="rounded-lg bg-destructive/10 p-4 border border-destructive/20">
+                                        <p className="text-sm text-destructive font-medium mb-2">
+                                            Failed to load mailboxes
+                                        </p>
+                                        <p className="text-xs text-destructive/80 mb-3">
+                                            {typeof mailboxesError === "string"
+                                                ? mailboxesError
+                                                : "An error occurred while loading mailboxes"}
+                                        </p>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={refetchMailboxes}
+                                            className="cursor-pointer"
+                                        >
+                                            <RefreshCw className="w-3 h-3 mr-1" />
+                                            Retry
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <nav className="p-2">
+                                    {folders.length > 0 ? (
+                                        folders.map((folder) => (
+                                            <Button
+                                                variant={"ghost"}
+                                                key={folder.id}
+                                                onClick={() => {
+                                                    setSelectedFolder(folder.id);
+                                                    setShowMobileFolders(false);
+                                                }}
+                                                className={`
+                                                    w-full flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer
+                                                    transition-colors text-left
+                                                    ${
+                                                        selectedFolder === folder.id
+                                                            ? "bg-mail-selected text-foreground"
+                                                            : "text-muted-foreground"
+                                                    }
+                        `}
+                                            >
+                                                {folder.icon}
+                                                <span className="flex-1">{folder.name}</span>
+                                                {folder.count ? (
+                                                    <Badge variant="secondary" className="ml-auto">
+                                                        {folder.count}
+                                                    </Badge>
+                                                ) : null}
+                                            </Button>
+                                        ))
+                                    ) : (
+                                        <div className="p-4 text-center text-muted-foreground">
+                                            <p className="text-sm">No mailboxes available</p>
+                                        </div>
+                                    )}
+                                </nav>
+                            )}
                         </ScrollArea>
                     </div>
                 </aside>
@@ -329,11 +364,14 @@ export default function Dashboard() {
                                     setEmails([]);
                                     setOffset(0);
                                     setHasMore(true);
+                                    refetchMailboxes();
                                 }}
-                                disabled={isLoading}
+                                disabled={isLoading || isLoadingMailboxes}
                             >
                                 <RefreshCw
-                                    className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
+                                    className={`w-4 h-4 ${
+                                        isLoading || isLoadingMailboxes ? "animate-spin" : ""
+                                    }`}
                                 />
                             </Button>
                             <Button

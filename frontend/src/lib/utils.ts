@@ -44,9 +44,6 @@ export function formatDateShort(dateString: string): string {
     }
 }
 
-/**
- * Format date in long format (e.g., "November 17, 2025, 2:30 PM")
- */
 export function formatDateLong(dateString: string): string {
     try {
         const date = new Date(dateString);
@@ -64,4 +61,11 @@ export function formatDateLong(dateString: string): string {
     } catch {
         return dateString;
     }
+}
+
+export function formatMailboxName(name: string): string {
+    return name
+        .split("_")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(" ");
 }

@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
 import googleOauthConfig from 'src/config/google-oauth.config';
+import jwtConfig from 'src/config/jwt.config';
 import { User } from 'src/user/entities/user.entity';
 import { UserService } from 'src/user/user.service';
 import { encrypt } from 'src/utils/encrypt.util';
@@ -12,13 +13,18 @@ import { compareHashedText } from 'src/utils/hash.util';
 @Injectable()
 export class AuthService {
   private oauth2Client: OAuth2Client;
+  private jwtSecret: string;
+  private jwtRefreshSecret: string;
 
   constructor(
     private jwtService: JwtService,
     private userService: UserService,
     @Inject(googleOauthConfig.KEY)
     googleOauthConfiguration: ConfigType<typeof googleOauthConfig>,
+    @Inject(jwtConfig.KEY) jwtConfiguration: ConfigType<typeof jwtConfig>,
   ) {
+    this.jwtSecret = jwtConfiguration.secret;
+    this.jwtRefreshSecret = jwtConfiguration.refreshSecret;
     this.oauth2Client = new google.auth.OAuth2(
       googleOauthConfiguration.clientId,
       googleOauthConfiguration.clientSecret,
@@ -47,8 +53,14 @@ export class AuthService {
 
       const payload = { sub: user.id, email: user.email };
       const [at, rt] = await Promise.all([
-        this.jwtService.signAsync(payload),
-        this.jwtService.signAsync(payload),
+        this.jwtService.signAsync(payload, {
+          secret: this.jwtSecret,
+          expiresIn: '15m',
+        }),
+        this.jwtService.signAsync(payload, {
+          secret: this.jwtRefreshSecret,
+          expiresIn: '7d',
+        }),
       ]);
 
       await this.userService.updateRtHash(user.id, rt);
@@ -94,8 +106,14 @@ export class AuthService {
     const payload = { sub: userId, email };
 
     const [at, rt] = await Promise.all([
-      this.jwtService.signAsync(payload),
-      this.jwtService.signAsync(payload),
+      this.jwtService.signAsync(payload, {
+        secret: this.jwtSecret,
+        expiresIn: '15m',
+      }),
+      this.jwtService.signAsync(payload, {
+        secret: this.jwtRefreshSecret,
+        expiresIn: '7d',
+      }),
     ]);
 
     return { access_token: at, refresh_token: rt };

@@ -1,9 +1,9 @@
-import { Injectable, ForbiddenException, Inject } from "@nestjs/common";
-import { ConfigType } from "@nestjs/config";
-import { PassportStrategy } from "@nestjs/passport";
-import { Request } from "express";
-import { Strategy, ExtractJwt } from "passport-jwt";
-import jwtConfig from "src/config/jwt.config";
+import { Injectable, ForbiddenException, Inject } from '@nestjs/common';
+import { ConfigType } from '@nestjs/config';
+import { PassportStrategy } from '@nestjs/passport';
+import { Request } from 'express';
+import { Strategy, ExtractJwt } from 'passport-jwt';
+import jwtConfig from 'src/config/jwt.config';
 
 @Injectable()
 export class RtStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
@@ -20,7 +20,7 @@ export class RtStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
           return token;
         },
       ]),
-      secretOrKey: jwtConfiguration.secret,
+      secretOrKey: jwtConfiguration.refreshSecret,
       passReqToCallback: true,
     });
   }

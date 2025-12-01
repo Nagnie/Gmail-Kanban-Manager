@@ -87,12 +87,14 @@ export class SendEmailDto {
   threadId?: string;
 
   @ApiPropertyOptional({
-    description: 'Array of attachment data (base64)',
-    type: [Object],
+    description: 'Binary file attachments',
+    type: 'array',
+    items: {
+      type: 'string',
+      format: 'binary',
+    },
   })
-  @IsOptional()
-  @IsArray()
-  attachments?: AttachmentDto[];
+  files?: Express.Multer.File[];
 
   @ApiPropertyOptional({
     description: 'Threading headers for proper email threading in Gmail',
@@ -100,21 +102,12 @@ export class SendEmailDto {
   })
   @IsOptional()
   threadingHeaders?: ThreadingHeadersDto;
+
+  internalAttachments?: AttachmentDto[];
 }
 
 export class AttachmentDto {
-  @ApiProperty({ example: 'document.pdf' })
-  @IsString()
   filename: string;
-
-  @ApiProperty({ example: 'application/pdf' })
-  @IsString()
   mimeType: string;
-
-  @ApiProperty({
-    description: 'Base64 encoded file data',
-    example: 'JVBERi0xLjQKJeLjz9MK...',
-  })
-  @IsString()
   data: string; // base64
 }

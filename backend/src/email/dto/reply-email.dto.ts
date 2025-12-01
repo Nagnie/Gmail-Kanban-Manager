@@ -103,10 +103,12 @@ export class ReplyEmailDto {
   includeOriginalAttachments?: boolean;
 
   @ApiPropertyOptional({
-    description: 'New attachments to add',
-    type: [AttachmentDto],
+    description: 'New binary file attachments to add',
+    type: 'array',
+    items: {
+      type: 'string',
+      format: 'binary',
+    },
   })
-  @IsOptional()
-  @IsArray()
-  newAttachments?: AttachmentDto[];
+  files?: Express.Multer.File[];
 }

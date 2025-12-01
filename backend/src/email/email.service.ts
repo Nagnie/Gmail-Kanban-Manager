@@ -172,6 +172,11 @@ export class EmailService {
       );
     }
 
+    // Validate file sizes before processing
+    if (sendEmailDto.files && sendEmailDto.files.length > 0) {
+      this.validateAttachmentSizes(sendEmailDto.files);
+    }
+
     const rawMessage = buildRFC822Message(sendEmailDto);
     const encodedMessage = encodeBase64Url(rawMessage);
 
@@ -184,6 +189,28 @@ export class EmailService {
     const parsedMessage = parseEmailDetail(sentMessage);
 
     return parsedMessage;
+  }
+
+  private validateAttachmentSizes(files: Express.Multer.File[]): void {
+    const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB per file
+    const MAX_TOTAL_SIZE = 25 * 1024 * 1024; // 25MB total
+
+    // Check individual file size
+    for (const file of files) {
+      if (file.size > MAX_FILE_SIZE) {
+        throw new BadRequestException(
+          `File "${file.originalname}" exceeds 25MB limit (${(file.size / 1024 / 1024).toFixed(2)}MB)`,
+        );
+      }
+    }
+
+    // Check total size
+    const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+    if (totalSize > MAX_TOTAL_SIZE) {
+      throw new BadRequestException(
+        `Total attachments size exceeds 25MB limit (${(totalSize / 1024 / 1024).toFixed(2)}MB)`,
+      );
+    }
   }
 
   async replyToEmail(userId: number, emailId: string, replyDto: ReplyEmailDto) {
@@ -199,7 +226,7 @@ export class EmailService {
   private buildReplyMessage(
     originalMessage: EmailDetailDto,
     replyDto: ReplyEmailDto,
-  ) {
+  ): SendEmailDto {
     const headers = originalMessage.headers;
 
     const originalFrom = headers?.from || '';
@@ -237,6 +264,7 @@ export class EmailService {
 
         subject = this.buildReplySubject(originalSubject);
         break;
+
       case ReplyType.REPLY_ALL:
         // Reply to sender + all recipients
         to = this.parseEmailAddresses(originalFrom);
@@ -304,6 +332,7 @@ export class EmailService {
     // Handle attachments
     const allAttachments: AttachmentDto[] = [];
 
+    // Include original attachments if requested
     if (
       replyDto.includeOriginalAttachments &&
       originalAttachments?.length > 0
@@ -312,9 +341,15 @@ export class EmailService {
       allAttachments.push(...attachments);
     }
 
-    // Add new attachments from replyDto
-    if (replyDto.newAttachments && replyDto.newAttachments.length > 0) {
-      allAttachments.push(...replyDto.newAttachments);
+    // Add new attachments from binary files
+    if (replyDto.files && replyDto.files.length > 0) {
+      for (const file of replyDto.files) {
+        allAttachments.push({
+          filename: file.originalname,
+          mimeType: file.mimetype || 'application/octet-stream',
+          data: file.buffer.toString('base64'),
+        });
+      }
     }
 
     // Build threading headers for proper Gmail threading
@@ -333,8 +368,11 @@ export class EmailService {
       textBody: finalTextBody,
       htmlBody: finalHtmlBody,
       threadId: originalMessage.threadId,
-      attachments: allAttachments.length > 0 ? allAttachments : undefined,
+      files: undefined, // Don't pass files again (already converted to attachments)
       threadingHeaders,
+      // Internal use only - pass converted attachments
+      internalAttachments:
+        allAttachments.length > 0 ? allAttachments : undefined,
     };
   }
 

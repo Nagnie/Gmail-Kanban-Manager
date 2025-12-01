@@ -16,16 +16,35 @@ export function buildRFC822Message(sendDto: SendEmailDto): string {
   addEmailHeaders(lines, sendDto);
   lines.push('MIME-Version: 1.0');
 
+  // Collect all attachments (from files or internalAttachments)
+  const attachments: AttachmentDto[] = [];
+
+  // From binary files (send API)
+  if (sendDto.files && sendDto.files.length > 0) {
+    for (const file of sendDto.files) {
+      attachments.push({
+        filename: file.originalname,
+        mimeType: file.mimetype || 'application/octet-stream',
+        data: file.buffer.toString('base64'),
+      });
+    }
+  }
+
+  // From internal attachments (reply API with original attachments)
+  if (sendDto.internalAttachments && sendDto.internalAttachments.length > 0) {
+    attachments.push(...sendDto.internalAttachments);
+  }
+
   // Determine message structure
   const bodyParts: BodyParts = {
     textBody: sendDto.textBody,
     htmlBody: sendDto.htmlBody,
-    hasAttachments: !!(sendDto.attachments && sendDto.attachments.length > 0),
+    hasAttachments: attachments.length > 0,
     hasBothBodies: !!sendDto.textBody && !!sendDto.htmlBody,
   };
 
   if (bodyParts.hasAttachments) {
-    buildMultipartMixed(lines, boundary, bodyParts, sendDto.attachments);
+    buildMultipartMixed(lines, boundary, bodyParts, attachments);
   } else if (bodyParts.hasBothBodies) {
     buildMultipartAlternative(lines, boundary, bodyParts);
   } else {

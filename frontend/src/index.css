@@ -174,54 +174,58 @@
     }
 }
 
-/* Email HTML content styles */
 .email-content {
-    word-break: break-word;
+    width: 100%;
+    max-width: 100%;
     overflow-wrap: break-word;
+    word-wrap: break-word;
+    word-break: break-word;
+    display: block;
+    overflow-x: auto;
 }
 
-.email-content a {
-    @apply text-primary underline hover:opacity-80;
+/* Force all direct children to respect container width */
+.email-content > * {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
 }
 
-.email-content img {
-    @apply max-w-full h-auto;
-}
-
+/* Override fixed width tables */
 .email-content table {
-    @apply w-full border-collapse my-2;
+    max-width: 100% !important;
+    width: 100% !important;
+    display: table !important;
+    table-layout: auto !important;
+    border-collapse: collapse !important;
 }
 
 .email-content table td,
 .email-content table th {
-    @apply border p-2;
+    max-width: 100% !important;
+    overflow-wrap: break-word !important;
+    word-wrap: break-word !important;
+    word-break: break-word !important;
 }
 
-.email-content pre {
-    @apply bg-secondary p-3 rounded overflow-x-auto my-2;
+/* Handle div containers with fixed widths */
+.email-content div,
+.email-content center {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* Gmail specific styles */
+.email-content .gmail_quote {
 }
 
 .email-content blockquote {
-    @apply border-l-4 border-muted-foreground pl-4 py-2 my-2 text-muted-foreground italic;
+    max-width: 100% !important;
 }
 
-.email-content h1,
-.email-content h2,
-.email-content h3,
-.email-content h4,
-.email-content h5,
-.email-content h6 {
-    @apply font-bold my-2;
+.email-content a {
+    word-break: break-all !important;
 }
 
-.email-content h1 {
-    @apply text-2xl;
-}
-
-.email-content h2 {
-    @apply text-xl;
-}
-
-.email-content h3 {
-    @apply text-lg;
+.email-content p {
+    max-width: 100% !important;
 }

@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo } from "react";
 import {
     Reply,
     ReplyAll,
@@ -9,13 +9,13 @@ import {
     Mail,
     Trash,
     FileText,
-    Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDateLong } from "@/lib/utils";
 import type { ThreadMessage } from "@/services/mailboxes/types";
 import { useTheme } from "@/components/theme-provider";
+import DOMPurify from "dompurify";
 
 interface EmailDetailProps {
     message: ThreadMessage | null;
@@ -33,9 +33,18 @@ export function EmailDetail({
     onDelete,
 }: EmailDetailProps) {
     const { theme } = useTheme();
-    const [isIframeLoading, setIsIframeLoading] = useState(false);
-    console.log("🚀 ~ EmailDetail ~ isIframeLoading:", isIframeLoading);
-    const iframeRef = useRef<HTMLIFrameElement>(null);
+
+    // Sanitize HTML content using DOMPurify
+    const sanitizedHTML = useMemo(() => {
+        if (!message?.body.htmlBody) return "";
+
+        return DOMPurify.sanitize(message.body.htmlBody, {
+            ADD_TAGS: ["style"],
+            ADD_ATTR: ["target", "class", "style"],
+            ALLOWED_URI_REGEXP:
+                /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|cid|xmpp):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+        });
+    }, [message?.body.htmlBody]);
 
     if (!message) {
         return (
@@ -108,7 +117,7 @@ export function EmailDetail({
                 </div>
             </div>
 
-            <ScrollArea className="flex-1 overflow-hidden">
+            <ScrollArea className="flex-1 overflow-hidden max-w-full">
                 <div className="py-4 px-8">
                     <h1 className="text-2xl font-bold mb-4">{message.headers.subject}</h1>
 
@@ -127,89 +136,12 @@ export function EmailDetail({
                         </div>
                     </div>
 
-                    {/* Display HTML content in iframe if available, fallback to plain text */}
+                    {/* Display HTML content directly with dangerouslySetInnerHTML */}
                     {message.body.htmlBody ? (
-                        <div className="overflow-hidden mb-6">
-                            {isIframeLoading && (
-                                <div className="flex items-center justify-center p-8 gap-2 text-muted-foreground">
-                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                    <span>Loading email content...</span>
-                                </div>
-                            )}
-                            <iframe
-                                ref={iframeRef}
-                                className={`w-full border-0 ${isIframeLoading ? "hidden" : ""}`}
-                                title="Email content"
-                                srcDoc={`<!DOCTYPE html>
-                                <html>
-                                <head>
-                                    <meta charset="UTF-8">
-                                    <base target="_blank">
-                                    <style>
-                                        body {
-                                            font-family: Arial, sans-serif;
-                                            font-size: 13px;
-                                            color: ${theme === "dark" ? "#FFFFFF" : "#000000"};
-                                            margin: 0;
-                                            overflow-y: hidden;
-                                            background-color: ${
-                                                theme === "dark" ? "#101828" : "white"
-                                            };
-                                        }
-                                        .gmail_quote_container {
-                                            margin-top: 20px;
-                                        }
-                                        .gmail_attr {
-                                            color: ${theme === "dark" ? "#AAAAAA" : "#666666"};
-                                            font-size: 12px;
-                                            margin-bottom: 8px;
-                                        }
-                                        .gmail_quote {
-                                            margin: 0px 0px 0px 0.8ex;
-                                            border-left: 1px solid rgb(204, 204, 204);
-                                            padding-left: 1ex;
-                                            color: ${theme === "dark" ? "#AAAAAA" : "#666666"};
-                                        }
-                                        blockquote {
-                                            margin: 0;
-                                            padding-left: 1ex;
-                                            border-left: 1px solid #ccc;
-                                            color: ${theme === "dark" ? "#AAAAAA" : "#666666"};
-                                        }
-                                        img {
-                                            max-width: 100%;
-                                            height: auto;
-                                        }
-                                        a {
-                                            color: #1155cc;
-                                            text-decoration: none;
-                                        }
-                                        a:hover {
-                                            text-decoration: underline;
-                                        }
-                                    </style>
-                                </head>
-                                <body>
-                                    ${message.body.htmlBody}
-                                </body>
-                                </html>`}
-                                sandbox="allow-same-origin allow-scripts allow-popups allow-popups-to-escape-sandbox"
-                                onLoad={(e) => {
-                                    const iframe = e.currentTarget;
-                                    try {
-                                        const height =
-                                            iframe.contentDocument?.documentElement.scrollHeight;
-                                        if (height) {
-                                            iframe.style.height = height + "px";
-                                        }
-                                    } catch (err) {
-                                        console.error("Error calculating iframe height:", err);
-                                    }
-                                    setIsIframeLoading(false);
-                                }}
-                                onLoadStart={() => setIsIframeLoading(true)}
-                            />
-                        </div>
+                        <div
+                            className="email-content mb-6 overflow-x-auto"
+                            dangerouslySetInnerHTML={{ __html: sanitizedHTML }}
+                        />
                     ) : (
                         <p className="whitespace-pre-wrap mb-6">
                             {message.body.textBody || message.snippet}

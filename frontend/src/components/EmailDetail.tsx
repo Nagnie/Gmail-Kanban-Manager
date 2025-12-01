@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { formatDateLong } from "@/lib/utils";
+import { formatDateLong, formatFileSize } from "@/lib/utils";
 import type { ThreadMessage } from "@/services/mailboxes/types";
 import DOMPurify from "dompurify";
 import {
@@ -21,6 +21,7 @@ import {
     useMarkAsReadMutation,
     useMarkAsUnreadMutation,
     useDeleteEmailMutation,
+    useDownloadAttachmentMutation,
 } from "@/services/tanstack-query";
 
 interface EmailDetailProps {
@@ -36,6 +37,8 @@ export function EmailDetail({ message, onBack }: EmailDetailProps) {
     const { mutate: markAsRead } = useMarkAsReadMutation();
     const { mutate: markAsUnread } = useMarkAsUnreadMutation();
     const { mutate: deleteEmail } = useDeleteEmailMutation();
+    const { mutate: downloadAttachment, isPending: isDownloading } =
+        useDownloadAttachmentMutation();
 
     // Auto mark as read when email is opened if it's unread
     useEffect(() => {
@@ -93,6 +96,17 @@ export function EmailDetail({ message, onBack }: EmailDetailProps) {
         if (onBack) {
             onBack();
         }
+    };
+
+    const handleDownloadAttachment = (attachmentId: string, filename: string, mimeType: string) => {
+        if (!message) return;
+
+        downloadAttachment({
+            attachmentId,
+            messageId: message.id,
+            filename,
+            mimeType,
+        });
     };
 
     return (
@@ -200,7 +214,7 @@ export function EmailDetail({ message, onBack }: EmailDetailProps) {
                                                         {attachment.filename}
                                                     </div>
                                                     <div className="text-sm text-muted-foreground">
-                                                        {(attachment.size / 1024).toFixed(2)} KB
+                                                        {formatFileSize(attachment.size)}
                                                     </div>
                                                 </div>
                                             </div>
@@ -208,6 +222,14 @@ export function EmailDetail({ message, onBack }: EmailDetailProps) {
                                                 variant="ghost"
                                                 size="sm"
                                                 className="cursor-pointer"
+                                                onClick={() =>
+                                                    handleDownloadAttachment(
+                                                        attachment.attachmentId,
+                                                        attachment.filename,
+                                                        attachment.mimeType
+                                                    )
+                                                }
+                                                disabled={isDownloading}
                                             >
                                                 <Download className="w-4 h-4" />
                                             </Button>

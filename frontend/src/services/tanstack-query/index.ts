@@ -19,3 +19,6 @@ export {
     useBatchModifyEmailsMutation,
 } from "@/services/email/useEmailMutations";
 export { emailKeys } from "@/services/email/queryKeys";
+// Attachment exports
+export { useDownloadAttachmentMutation } from "@/services/attachment/useAttachmentQueries";
+export { attachmentKeys } from "@/services/attachment/queryKeys";

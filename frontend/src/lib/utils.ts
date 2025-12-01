@@ -5,9 +5,6 @@ export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
 }
 
-/**
- * Format date in short format (e.g., "Nov 17")
- */
 export function formatDateShort(dateString: string): string {
     try {
         const date = new Date(dateString);
@@ -68,4 +65,15 @@ export function formatMailboxName(name: string): string {
         .split("_")
         .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
         .join(" ");
+}
+
+export function formatFileSize(bytes: number): string {
+    if (bytes === 0) return "0 B";
+
+    const units = ["B", "KB", "MB", "GB", "TB"];
+    const k = 1024;
+    const index = Math.floor(Math.log(bytes) / Math.log(k));
+    const value = bytes / Math.pow(k, index);
+
+    return `${value.toFixed(2)} ${units[index]}`;
 }

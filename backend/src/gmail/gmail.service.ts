@@ -215,4 +215,62 @@ export class GmailService {
 
     return res.data;
   }
+
+  async getThreadMetadata(userId: number, threadId: string) {
+    const gmail = await this.getAuthenticatedGmailClient(userId);
+    const res = await gmail.users.threads.get({
+      userId: 'me',
+      id: threadId,
+      format: 'metadata',
+      metadataHeaders: ['Subject', 'From', 'To', 'Date'],
+    });
+    return res.data;
+  }
+
+  async getThreadsByLabel(
+    userId: number,
+    labelId: string,
+    query?: string,
+    pageToken?: string,
+    maxResults: number = 20,
+  ) {
+    const gmail = await this.getAuthenticatedGmailClient(userId);
+    const res = await gmail.users.threads.list({
+      userId: 'me',
+      labelIds: [labelId],
+      q: query,
+      maxResults,
+      pageToken,
+    });
+    return res.data;
+  }
+
+  async getThreadsByLabels(
+    userId: number,
+    labelIds: string[],
+    query?: string,
+    pageToken?: string,
+    maxResults: number = 20,
+  ) {
+    const gmail = await this.getAuthenticatedGmailClient(userId);
+    const res = await gmail.users.threads.list({
+      userId: 'me',
+      labelIds: labelIds,
+      q: query,
+      maxResults,
+      pageToken,
+    });
+    return res.data;
+  }
+
+  async listThreads(userId: number, query?: string, pageToken?: string) {
+    const gmail = await this.getAuthenticatedGmailClient(userId);
+    const res = await gmail.users.threads.list({
+      userId: 'me',
+      q: query,
+      maxResults: 20,
+      pageToken: pageToken,
+    });
+    return res.data;
+  }
 }

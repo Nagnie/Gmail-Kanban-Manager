@@ -28,6 +28,7 @@ export class MailboxController {
     const query = req.query.q;
     const pageToken = req.query.pageToken;
     return this.mailboxService.getEmailsByLabel(
+      req.user.email,
       req.user.sub,
       labelId,
       query,

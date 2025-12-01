@@ -7,5 +7,6 @@ import { GmailModule } from 'src/gmail/gmail.module';
   imports: [GmailModule],
   controllers: [ThreadController],
   providers: [ThreadService],
+  exports: [ThreadService],
 })
 export class ThreadModule {}

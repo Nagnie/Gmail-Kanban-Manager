@@ -9,7 +9,6 @@ import {
     Plus,
     RefreshCw,
     Menu,
-    X,
     Check,
     Loader2,
     ChevronLeft,
@@ -211,7 +210,6 @@ export default function Dashboard() {
 
     // Determine if we should show loading overlay
     const showLoadingOverlay = isLoadingEmails || (isFetchingEmails && emails.length === 0);
-    console.log("🚀 ~ Dashboard ~ showLoadingOverlay:", showLoadingOverlay);
 
     return (
         <div className="h-[calc(100vh-64px)] flex flex-col">
@@ -240,17 +238,6 @@ export default function Dashboard() {
                     `}
                 >
                     <div className="h-full flex flex-col bg-sidebar">
-                        <div className="p-4 border-b flex items-center justify-between">
-                            <h2 className="font-semibold text-2xl">Mailboxes</h2>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="lg:hidden"
-                                onClick={() => setShowMobileFolders(false)}
-                            >
-                                <X className="w-5 h-5" />
-                            </Button>
-                        </div>
                         <ScrollArea className="flex-1">
                             {isLoadingMailboxes ? (
                                 <div className="p-4 flex flex-col items-center justify-center gap-2">

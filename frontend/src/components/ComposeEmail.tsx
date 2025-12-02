@@ -28,10 +28,9 @@ export default function ComposeEmail({ onClose, mode, replyTo }: ComposeEmailPro
     const [showCc, setShowCc] = useState(false);
     const [showBcc, setShowBcc] = useState(false);
     const [toError, setToError] = useState('');
-    const [includeOriginalAttachments, setIncludeOriginalAttachments] = useState(false);
 
     const { mutate: sendEmail, isPending } = useSendEmailMutation();
-    const { mutate: replyForwardEmail, isPending: isPendingReply } = useReplyForwardEmailMutation(); // THÊM DÒNG NÀY
+    const { mutate: replyForwardEmail, isPending: isPendingReply } = useReplyForwardEmailMutation();
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
@@ -75,7 +74,7 @@ export default function ComposeEmail({ onClose, mode, replyTo }: ComposeEmailPro
             if (mode === 'forward') {
                 formData.append('to', JSON.stringify(to.split(',').map(email => email.trim())));
                 formData.append('subject', subject);
-                formData.append('includeOriginalAttachments', includeOriginalAttachments.toString());
+                // formData.append('includeOriginalAttachments', includeOriginalAttachments.toString());
             } else if (mode === 'reply_all') {
                 if (to) formData.append('to', JSON.stringify(to.split(',').map(email => email.trim())));
             }

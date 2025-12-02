@@ -4,17 +4,21 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { X, Paperclip, Send, Loader2 } from 'lucide-react';
 import { useSendEmailMutation } from '@/services/email/useEmailMutations';
+import { useReplyForwardEmailMutation } from '@/services/email/useEmailMutations';
 
 interface ComposeEmailProps {
     onClose: () => void;
+    mode: 'compose' | 'reply' | 'reply_all' | 'forward' | null;
     replyTo?: {
+        emailId: string;
         threadId: string;
         subject: string;
         to: string;
+        cc?: string;
+        body?: string;
     };
 }
-
-export default function ComposeEmail({ onClose, replyTo }: ComposeEmailProps) {
+export default function ComposeEmail({ onClose, mode, replyTo }: ComposeEmailProps) {
     const [to, setTo] = useState(replyTo?.to || '');
     const [cc, setCc] = useState('');
     const [bcc, setBcc] = useState('');
@@ -24,8 +28,10 @@ export default function ComposeEmail({ onClose, replyTo }: ComposeEmailProps) {
     const [showCc, setShowCc] = useState(false);
     const [showBcc, setShowBcc] = useState(false);
     const [toError, setToError] = useState('');
+    const [includeOriginalAttachments, setIncludeOriginalAttachments] = useState(false);
 
     const { mutate: sendEmail, isPending } = useSendEmailMutation();
+    const { mutate: replyForwardEmail, isPending: isPendingReply } = useReplyForwardEmailMutation(); // THÊM DÒNG NÀY
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
@@ -50,37 +56,43 @@ export default function ComposeEmail({ onClose, replyTo }: ComposeEmailProps) {
 
         const formData = new FormData();
 
-        // Add recipients as JSON array
-        formData.append('to', JSON.stringify(to.split(',').map(email => email.trim())));
+        if (mode === 'compose') {
+            formData.append('to', JSON.stringify(to.split(',').map(email => email.trim())));
+            if (cc) formData.append('cc', JSON.stringify(cc.split(',').map(email => email.trim())));
+            if (bcc) formData.append('bcc', JSON.stringify(bcc.split(',').map(email => email.trim())));
+            formData.append('subject', subject);
+            formData.append('textBody', body);
+            if (replyTo?.threadId) formData.append('threadId', replyTo.threadId);
+            files.forEach((file) => formData.append('files', file));
 
-        if (cc) {
-            formData.append('cc', JSON.stringify(cc.split(',').map(email => email.trim())));
+            sendEmail(formData, {
+                onSuccess: () => onClose(),
+                onError: (error) => console.error(error),
+            });
+        } else {
+            formData.append('type', mode!);
+
+            if (mode === 'forward') {
+                formData.append('to', JSON.stringify(to.split(',').map(email => email.trim())));
+                formData.append('subject', subject);
+                formData.append('includeOriginalAttachments', includeOriginalAttachments.toString());
+            } else if (mode === 'reply_all') {
+                if (to) formData.append('to', JSON.stringify(to.split(',').map(email => email.trim())));
+            }
+
+            if (cc) formData.append('cc', JSON.stringify(cc.split(',').map(email => email.trim())));
+            if (bcc) formData.append('bcc', JSON.stringify(bcc.split(',').map(email => email.trim())));
+            formData.append('textBody', body);
+            files.forEach((file) => formData.append('files', file));
+
+            replyForwardEmail(
+                { emailId: replyTo!.emailId, data: formData },
+                {
+                    onSuccess: () => onClose(),
+                    onError: (error) => console.error(error),
+                }
+            );
         }
-
-        if (bcc) {
-            formData.append('bcc', JSON.stringify(bcc.split(',').map(email => email.trim())));
-        }
-
-        formData.append('subject', subject);
-        formData.append('textBody', body);
-
-        if (replyTo?.threadId) {
-            formData.append('threadId', replyTo.threadId);
-        }
-
-        // Add files
-        files.forEach((file) => {
-            formData.append('files', file);
-        });
-
-        sendEmail(formData, {
-            onSuccess: () => {
-                onClose();
-            },
-            onError: (error) => {
-                console.error(error);
-            },
-        });
     };
 
     return (
@@ -205,7 +217,7 @@ export default function ComposeEmail({ onClose, replyTo }: ComposeEmailProps) {
                 <div className="flex gap-2">
                     <Button
                         onClick={handleSend}
-                        disabled={isPending}
+                        disabled={mode === 'compose' ? isPending : isPendingReply}
                         className="cursor-pointer"
                     >
                         {isPending ? (

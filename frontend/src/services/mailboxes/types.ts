@@ -32,6 +32,8 @@ export interface EmailBody {
 
 export interface MessageHeaders {
     subject: string;
+    cc?: string;
+    bcc?: string;
     from: string;
     to: string;
     date: string;

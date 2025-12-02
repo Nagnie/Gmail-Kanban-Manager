@@ -25,12 +25,41 @@ import {
 } from "@/services/tanstack-query";
 
 interface EmailDetailProps {
-    message: ThreadMessage | null;
+    message: ThreadMessage;
     onBack?: () => void;
-    onRefreshEmails?: () => void;
+    onReply?: (data: {
+        emailId: string;
+        threadId: string;
+        subject: string;
+        from: string;
+        to: string;
+        cc?: string;
+        bcc?: string;
+        body?: string;
+    }) => void;
+    onReplyAll?: (data: {
+        emailId: string;
+        threadId: string;
+        subject: string;
+        from: string;
+        to: string;
+        cc?: string;
+        bcc?: string;
+        body?: string;
+    }) => void;
+    onForward?: (data: {
+        emailId: string;
+        threadId: string;
+        subject: string;
+        from: string;
+        to: string;
+        cc?: string;
+        bcc?: string;
+        body?: string;
+    }) => void;
 }
-
-export function EmailDetail({ message, onBack }: EmailDetailProps) {
+    
+export function EmailDetail({ message, onBack, onReply, onReplyAll, onForward }: EmailDetailProps) {
     // Email action mutations
     const { mutate: starEmail } = useStarEmailMutation();
     const { mutate: unstarEmail } = useUnstarEmailMutation();
@@ -119,15 +148,65 @@ export function EmailDetail({ message, onBack }: EmailDetailProps) {
                         </Button>
                     )}
                     <div className="flex gap-3 flex-wrap flex-1">
-                        <Button variant="ghost" size="sm" className="cursor-pointer">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="cursor-pointer"
+                            onClick={() =>
+                                onReply?.({
+                                    emailId: message.id,
+                                    threadId: message.threadId,
+                                    subject: message.headers.subject,  // headers (có 's')
+                                    from: message.headers.from,
+                                    to: message.headers.to,
+                                    cc: message.headers.cc,
+                                    bcc: message.headers.bcc,
+                                    body: message.snippet || message.body.textBody,  // body.textBody
+                                })
+                            }
+                        >
                             <Reply className="w-4 h-4 mr-1 text-mail-foreground" />
                             Reply
                         </Button>
-                        <Button variant="ghost" size="sm" className="cursor-pointer">
+
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="cursor-pointer"
+                            onClick={() =>
+                                onReplyAll?.({
+                                    emailId: message.id,
+                                    threadId: message.threadId,
+                                    subject: message.headers.subject,
+                                    from: message.headers.from,
+                                    to: message.headers.to,
+                                    cc: message.headers.cc,
+                                    bcc: message.headers.bcc,
+                                    body: message.snippet || message.body.textBody,
+                                })
+                            }
+                        >
                             <ReplyAll className="w-4 h-4 mr-1 text-mail-foreground" />
                             Reply All
                         </Button>
-                        <Button variant="ghost" size="sm" className="cursor-pointer">
+
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="cursor-pointer"
+                            onClick={() =>
+                                onForward?.({
+                                    emailId: message.id,
+                                    threadId: message.threadId,
+                                    subject: message.headers.subject,
+                                    from: message.headers.from,
+                                    to: message.headers.to,
+                                    cc: message.headers.cc,
+                                    bcc: message.headers.bcc,
+                                    body: message.snippet || message.body.textBody,
+                                })
+                            }
+                        >
                             <Forward className="w-4 h-4 mr-1 text-mail-foreground" />
                             Forward
                         </Button>

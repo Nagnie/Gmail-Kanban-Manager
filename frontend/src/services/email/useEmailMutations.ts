@@ -18,6 +18,7 @@ import {
     modifyEmail,
     batchModifyEmails,
     sendEmail,
+    replyOrForwardEmail,
 } from "./api";
 
 // Helper type for update function
@@ -551,6 +552,20 @@ export const useSendEmailMutation = () => {
             // Invalidate để refresh danh sách email
             queryClient.invalidateQueries({ queryKey: ['emails'] });
             queryClient.invalidateQueries({ queryKey: ['mailboxes'] });
+        },
+    });
+};
+
+export const useReplyForwardEmailMutation = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: ({ emailId, data }: { emailId: string; data: FormData }) =>
+            replyOrForwardEmail(emailId, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['emails'] });
+            queryClient.invalidateQueries({ queryKey: ['mailboxes'] });
+            queryClient.invalidateQueries({ queryKey: ['thread'] });
         },
     });
 };

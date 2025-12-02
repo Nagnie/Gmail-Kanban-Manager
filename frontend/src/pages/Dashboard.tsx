@@ -62,11 +62,18 @@ export default function Dashboard() {
     const [selectedEmailIds, setSelectedEmailIds] = useState<Set<string>>(new Set());
     const [showMobileFolders, setShowMobileFolders] = useState(false);
     const [showMobileDetail, setShowMobileDetail] = useState(false);
-    const [composeOpen, setComposeOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [threadMessages, setThreadMessages] = useState<ThreadMessage[]>([]);
-    const [composeMode, setComposeMode] = useState<'compose' | 'reply' | null>(null);
-    const [replyData, setReplyData] = useState<{ threadId: string; subject: string; to: string } | undefined>();
+    const [composeMode, setComposeMode] = useState<'compose' | 'reply' | 'reply_all' | 'forward' | null>(null);
+    const [replyData, setReplyData] = useState<{
+        emailId: string;
+        threadId: string;
+        subject: string;
+        from: string;
+        to: string;
+        cc?: string;
+        body?: string;
+    } | undefined>();
 
     // Fetch emails from selected mailbox using TanStack Query infinite query
     const {
@@ -218,7 +225,7 @@ export default function Dashboard() {
                     <Menu className="w-5 h-5" />
                 </Button>
                 <h1 className="text-lg font-semibold">Email</h1>
-                <Button variant={"default"} onClick={() => setComposeOpen(true)} size="sm">
+                <Button variant={"default"} onClick={() => setComposeMode('compose')} size="sm">
                     <Plus className="w-4 h-4" />
                 </Button>
             </div>
@@ -518,6 +525,7 @@ export default function Dashboard() {
                 >
                     {composeMode ? (
                         <ComposeEmail
+                            mode={composeMode}
                             onClose={() => {
                                 setComposeMode(null);
                                 setReplyData(undefined);
@@ -553,11 +561,19 @@ export default function Dashboard() {
                                         <EmailDetail
                                             key={message.id}
                                             message={message}
-                                            onBack={
-                                                index === 0
-                                                    ? () => setShowMobileDetail(false)
-                                                    : undefined
-                                            }
+                                            onBack={index === 0 ? () => setShowMobileDetail(false) : undefined}
+                                            onReply={(data) => {
+                                                setReplyData(data);
+                                                setComposeMode('reply');
+                                            }}
+                                            onReplyAll={(data) => {
+                                                setReplyData(data);
+                                                setComposeMode('reply_all');
+                                            }}
+                                            onForward={(data) => {
+                                                setReplyData(data);
+                                                setComposeMode('forward');
+                                            }}
                                         />
                                     ))}
                                 </div>

@@ -120,3 +120,15 @@ export const sendEmail = async (emailData: FormData): Promise<EmailMessage> => {
     );
     return response.data.data || ({} as EmailMessage);
 };
+
+export const replyOrForwardEmail = async (
+    emailId: string,
+    data: FormData
+): Promise<EmailMessage> => {
+    const client = apiClient.getClient();
+    const response = await client.post<ApiResponse<EmailMessage>>(
+        `/api/v1/emails/${emailId}/reply`,
+        data
+    );
+    return response.data.data || ({} as EmailMessage);
+};

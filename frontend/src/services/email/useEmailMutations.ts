@@ -17,6 +17,7 @@ import {
     batchDeleteEmails,
     modifyEmail,
     batchModifyEmails,
+    sendEmail,
 } from "./api";
 
 // Helper type for update function
@@ -537,6 +538,19 @@ export const useBatchModifyEmailsMutation = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: mailboxesKeys.emails() });
             queryClient.invalidateQueries({ queryKey: mailboxesKeys.threads() });
+        },
+    });
+};
+
+export const useSendEmailMutation = () => {
+    const queryClient = useQueryClient();
+
+    return useMutation({
+        mutationFn: sendEmail,
+        onSuccess: () => {
+            // Invalidate để refresh danh sách email
+            queryClient.invalidateQueries({ queryKey: ['emails'] });
+            queryClient.invalidateQueries({ queryKey: ['mailboxes'] });
         },
     });
 };

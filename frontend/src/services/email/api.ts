@@ -111,3 +111,12 @@ export const untrashEmail = async (emailId: string): Promise<EmailMessage> => {
     );
     return response.data.data || ({} as EmailMessage);
 };
+
+export const sendEmail = async (emailData: FormData): Promise<EmailMessage> => {
+    const client = apiClient.getClient();
+    const response = await client.post<ApiResponse<EmailMessage>>(
+        `/api/v1/emails/send`,
+        emailData
+    );
+    return response.data.data || ({} as EmailMessage);
+};

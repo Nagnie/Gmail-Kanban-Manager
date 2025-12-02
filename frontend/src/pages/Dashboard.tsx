@@ -18,8 +18,6 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { type Folder } from "@/services/mail";
 import { EmailDetail } from "@/components/EmailDetail";
@@ -37,6 +35,7 @@ import {
     useMarkAsUnreadMutation,
 } from "@/services/tanstack-query";
 import type { ThreadMessage } from "@/services/mailboxes/types";
+import ComposeEmail from "@/components/ComposeEmail";
 
 // Icon mapping for mailbox IDs
 const mailboxIcons: Record<string, React.ReactNode> = {
@@ -66,6 +65,8 @@ export default function Dashboard() {
     const [composeOpen, setComposeOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [threadMessages, setThreadMessages] = useState<ThreadMessage[]>([]);
+    const [composeMode, setComposeMode] = useState<'compose' | 'reply' | null>(null);
+    const [replyData, setReplyData] = useState<{ threadId: string; subject: string; to: string } | undefined>();
 
     // Fetch emails from selected mailbox using TanStack Query infinite query
     const {
@@ -313,7 +314,7 @@ export default function Dashboard() {
 
                         <div className="flex items-center gap-2 flex-wrap">
                             <Button
-                                onClick={() => setComposeOpen(true)}
+                                onClick={() => setComposeMode('compose')}
                                 size="sm"
                                 className="hidden lg:flex cursor-pointer"
                             >
@@ -515,7 +516,15 @@ export default function Dashboard() {
                     flex-col flex-1 lg:w-2/5 overflow-hidden
                     `}
                 >
-                    {isLoadingThread ? (
+                    {composeMode ? (
+                        <ComposeEmail
+                            onClose={() => {
+                                setComposeMode(null);
+                                setReplyData(undefined);
+                            }}
+                            replyTo={replyData}
+                        />
+                    ) : isLoadingThread ? (
                         <div className="flex-1 flex items-center justify-center text-muted-foreground">
                             <div className="text-center">
                                 <Loader2 className="w-12 h-12 mx-auto mb-4 animate-spin opacity-50" />
@@ -564,35 +573,6 @@ export default function Dashboard() {
                     )}
                 </div>
             </div>
-
-            {/* Compose Dialog */}
-            <Dialog open={composeOpen} onOpenChange={setComposeOpen}>
-                <DialogContent className="max-w-2xl">
-                    <DialogHeader>
-                        <DialogTitle>New Message</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                        <Input placeholder="To" />
-                        <Input placeholder="Subject" />
-                        <Textarea placeholder="Compose your message..." rows={10} />
-                        <div className="flex justify-end gap-2">
-                            <Button
-                                variant="outline"
-                                className="cursor-pointer"
-                                onClick={() => setComposeOpen(false)}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                className="cursor-pointer"
-                                onClick={() => setComposeOpen(false)}
-                            >
-                                Send
-                            </Button>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
 
             {/* Mobile Overlay */}
             {showMobileFolders && (

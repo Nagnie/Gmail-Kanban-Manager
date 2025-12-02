@@ -21,6 +21,7 @@ export {
     moveEmailToInbox,
     archiveEmail,
     untrashEmail,
+    sendEmail,
 } from "./api";
 export type {
     DeleteBatchEmailDto,

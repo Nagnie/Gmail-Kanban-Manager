@@ -1,8 +1,8 @@
 # React Email Client with Gmail Integration
 
 ## Deployed public URLs
-Frontend: https://awad-navy.vercel.app/
-Backend: 
+- Frontend: https://awad-navy.vercel.app/
+- Backend: https://gmail-client-backend.vercel.app/
 
 ## Setup & Run Locally
 
@@ -13,10 +13,16 @@ cd AWAD
 ```
 
 ### 2. Frontend setup
+1. Install frontend dependencies & start server
 ```
 cd ./frontend
 npm install
 npm run dev
+```
+2. File .env
+```
+VITE_API_URL=
+VITE_GOOGLE_CLIENT_ID=
 ```
 
 ### 3. Backend setup
@@ -42,6 +48,29 @@ npm run dev:start
 - Google OAuth credentials
 - Redirect URIs
 - JWT secrets
+```
+PORT=
+
+DB_HOST=
+DB_NAME=
+DB_USERNAME=
+DB_PASSWORD=
+DB_SSLMODE=
+DB_CHANNELBINDING=
+DB_PORT=
+
+JWT_ACCESS_SECRET=
+JWT_ACCESS_EXPIRES_IN=
+JWT_REFRESH_SECRET=
+JWT_REFRESH_EXPIRES_IN=
+JWT_REFRESH_EXPIRATION_MS=
+
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=
+
+ENCRYPTION_KEY=
+```
 
 
 ## How to create Google OAuth credentials and set allowed redirect URIs

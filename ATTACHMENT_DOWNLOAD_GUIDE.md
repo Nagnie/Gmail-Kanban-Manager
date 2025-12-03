@@ -2,7 +2,7 @@
 
 ## Overview
 
-Tôi đã setup API call để download attachment bằng React Query theo cùng pattern với mailboxes và email services.
+Setup API call để download attachment bằng React Query theo cùng pattern với mailboxes và email services.
 
 ## File Structure Created
 

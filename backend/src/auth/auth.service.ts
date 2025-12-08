@@ -5,6 +5,7 @@ import { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
 import googleOauthConfig from 'src/config/google-oauth.config';
 import jwtConfig from 'src/config/jwt.config';
+import { GmailService } from 'src/gmail/gmail.service';
 import { User } from 'src/user/entities/user.entity';
 import { UserService } from 'src/user/user.service';
 import { encrypt } from 'src/utils/encrypt.util';
@@ -22,6 +23,8 @@ export class AuthService {
     @Inject(googleOauthConfig.KEY)
     googleOauthConfiguration: ConfigType<typeof googleOauthConfig>,
     @Inject(jwtConfig.KEY) jwtConfiguration: ConfigType<typeof jwtConfig>,
+
+    private gmailService: GmailService,
   ) {
     this.jwtSecret = jwtConfiguration.secret;
     this.jwtRefreshSecret = jwtConfiguration.refreshSecret;
@@ -64,6 +67,8 @@ export class AuthService {
       ]);
 
       await this.userService.updateRtHash(user.id, rt);
+
+      await this.gmailService.initializeKanbanLabels(user.id);
 
       return {
         appAccessToken: at,

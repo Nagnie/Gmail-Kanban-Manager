@@ -10,6 +10,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EmailSummary } from '../email/entities/email-summary.entity';
 import { KanbanColumnPaginationDto } from './dto/kanban-pagination.dto';
 import { EmailKanbanOrder } from '../email/entities/email-kanban-order.entity';
+import { MoveEmailDto, MoveEmailResponseDto } from './dto/move-email.dto';
+import {
+  BatchMoveEmailDto,
+  BatchMoveEmailResponseDto,
+} from './dto/batch-move-email.dto';
 
 @Injectable()
 export class KanbanService {
@@ -188,6 +193,133 @@ export class KanbanService {
     };
   }
 
+  async moveEmailToColumn(
+    userId: number,
+    emailId: string,
+    moveDto: MoveEmailDto,
+  ): Promise<MoveEmailResponseDto> {
+    if (moveDto.sourceColumn === moveDto.targetColumn) {
+      throw new BadRequestException(
+        'Cannot move to same column. Use reorder endpoint instead.',
+      );
+    }
+
+    const columnConfigMap = this.getColumnsMetadata().columns;
+
+    const targetConfig = columnConfigMap[moveDto.targetColumn];
+    const targetLabels = targetConfig.labelIds;
+    const targetLabelIds = await this.gmailService.convertLabelNamesToIds(
+      userId,
+      targetLabels,
+    );
+
+    const sourceConfig = columnConfigMap[moveDto.sourceColumn];
+    const sourceLabels = sourceConfig.labelIds;
+    const sourceLabelIds = await this.gmailService.convertLabelNamesToIds(
+      userId,
+      sourceLabels,
+    );
+
+    if (!sourceLabels || !targetLabels) {
+      throw new BadRequestException('Invalid column ID');
+    }
+
+    const addLabelIds: string[] = [...targetLabelIds];
+    const removeLabelIds: string[] = [...sourceLabelIds];
+
+    switch (moveDto.targetColumn) {
+      case KanbanColumnId.DONE:
+        removeLabelIds.push('UNREAD', 'INBOX');
+        break;
+
+      case KanbanColumnId.INBOX:
+        addLabelIds.push('INBOX');
+        removeLabelIds.push(
+          'Kanban/To Do',
+          'Kanban/In Progress',
+          'Kanban/Done',
+          'Kanban/Snoozed',
+        );
+        break;
+
+      case KanbanColumnId.SNOOZED:
+        removeLabelIds.push('INBOX');
+        break;
+    }
+
+    const uniqueAddLabels = [...new Set(addLabelIds)];
+    const uniqueRemoveLabels = [...new Set(removeLabelIds)];
+
+    await this.gmailService.modifyMessage(userId, emailId, {
+      addLabelIds: uniqueAddLabels,
+      removeLabelIds: uniqueRemoveLabels,
+    });
+
+    if (moveDto.targetPosition !== undefined) {
+      await this.orderRepository.upsert(
+        {
+          userId,
+          emailId,
+          columnId: moveDto.targetColumn,
+          order: moveDto.targetPosition,
+        },
+        ['userId', 'emailId', 'columnId'],
+      );
+
+      await this.shiftEmailPositions(
+        userId,
+        moveDto.targetColumn,
+        moveDto.targetPosition,
+        emailId,
+      );
+    } else {
+      await this.orderRepository.delete({
+        userId,
+        emailId,
+        columnId: moveDto.sourceColumn,
+      });
+    }
+
+    return {
+      success: true,
+      emailId: emailId,
+      sourceColumn: moveDto.sourceColumn,
+      targetColumn: moveDto.targetColumn,
+      message: `Email moved from "${moveDto.sourceColumn}" to "${moveDto.targetColumn}"`,
+    };
+  }
+
+  async batchMoveEmails(
+    userId: number,
+    batchDto: BatchMoveEmailDto,
+  ): Promise<BatchMoveEmailResponseDto> {
+    const results = await Promise.all(
+      batchDto.emailIds.map(async (emailId) => {
+        try {
+          await this.moveEmailToColumn(userId, emailId, {
+            sourceColumn: batchDto.sourceColumn,
+            targetColumn: batchDto.targetColumn,
+          });
+
+          return { emailId, success: true };
+        } catch (error) {
+          console.log('🚀 ~ KanbanService ~ batchMoveEmails ~ error:', error);
+          return { emailId, success: false, error: error.message };
+        }
+      }),
+    );
+
+    const moved = results.filter((r) => r.success).length;
+    const failed = results.filter((r) => !r.success).length;
+
+    return {
+      success: failed === 0,
+      moved,
+      failed,
+      results,
+    };
+  }
+
   private async buildEmailCard(
     userId: number,
     emailId: string,
@@ -214,6 +346,7 @@ export class KanbanService {
       attachmentCount: parsed.body.attachments?.length || 0,
       isUnread: parsed.labelIds?.includes('UNREAD') || false,
       isStarred: parsed.labelIds?.includes('STARRED') || false,
+      isImportant: parsed.labelIds?.includes('IMPORTANT') || false,
       labelIds: parsed.labelIds || [],
       threadId: parsed.threadId,
     };
@@ -322,5 +455,36 @@ export class KanbanService {
     });
 
     return orderMap;
+  }
+
+  private async shiftEmailPositions(
+    userId: number,
+    columnId: string,
+    insertPosition: number,
+    excludeEmailId: string,
+  ): Promise<void> {
+    const existingOrders = await this.orderRepository.find({
+      where: {
+        userId,
+        columnId,
+      },
+      order: {
+        order: 'ASC',
+      },
+    });
+
+    const updates = existingOrders
+      .filter(
+        (order) =>
+          order.emailId !== excludeEmailId && order.order >= insertPosition,
+      )
+      .map((order) => ({
+        ...order,
+        order: order.order + 1,
+      }));
+
+    if (updates.length > 0) {
+      await this.orderRepository.save(updates);
+    }
   }
 }

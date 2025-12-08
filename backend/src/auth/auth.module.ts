@@ -7,6 +7,7 @@ import { PassportModule } from '@nestjs/passport';
 import { UserModule } from 'src/user/user.module';
 import { RtStrategy } from './strategies/rt.strategy';
 import { AtStrategy } from './strategies/at.strategy';
+import { GmailModule } from '../gmail/gmail.module';
 
 @Module({
   imports: [
@@ -20,17 +21,14 @@ import { AtStrategy } from './strategies/at.strategy';
         global: true,
         secret: configService.get<string>('jwt.secret'),
         signOptions: {
-            expiresIn: configService.get('jwt.expiresIn'),
+          expiresIn: configService.get('jwt.expiresIn'),
         },
       }),
     }),
     PassportModule,
+    GmailModule,
   ],
   controllers: [AuthController],
-  providers: [
-    AuthService,
-    AtStrategy,
-    RtStrategy,
-  ],
+  providers: [AuthService, AtStrategy, RtStrategy],
 })
 export class AuthModule {}

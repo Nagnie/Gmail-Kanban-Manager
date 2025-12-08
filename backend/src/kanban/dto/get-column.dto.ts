@@ -63,4 +63,13 @@ export class GetColumnQueryDto {
   @IsBoolean()
   @Type(() => Boolean)
   isStarred?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Filter by important status',
+    example: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  @Type(() => Boolean)
+  isImportant?: boolean;
 }

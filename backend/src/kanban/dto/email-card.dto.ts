@@ -82,6 +82,12 @@ export class EmailCardDto {
   isStarred: boolean;
 
   @ApiProperty({
+    description: 'Whether email is important',
+    example: true,
+  })
+  isImportant: boolean;
+
+  @ApiProperty({
     description: 'Gmail label IDs',
     example: ['INBOX', 'UNREAD'],
     type: [String],

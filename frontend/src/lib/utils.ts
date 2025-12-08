@@ -77,3 +77,14 @@ export function formatFileSize(bytes: number): string {
 
     return `${value.toFixed(2)} ${units[index]}`;
 }
+
+export const extractSenderName = (from: string) => {
+  const match = from.match(/^(.+?)\s*</);
+  return match ? match[1].trim() : from;
+};
+
+export const getAISummary = (snippet: string) => {
+  return `AI Summary: ${snippet.substring(0, 50)}${
+    snippet.length > 100 ? "..." : ""
+  }`;
+};

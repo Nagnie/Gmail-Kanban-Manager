@@ -1,10 +1,12 @@
+import { Loader2, Paperclip, Send, X } from 'lucide-react';
 import { useState } from 'react';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { X, Paperclip, Send, Loader2 } from 'lucide-react';
-import { useSendEmailMutation } from '@/services/email/useEmailMutations';
-import { useReplyForwardEmailMutation } from '@/services/email/useEmailMutations';
+import {
+    useReplyForwardEmailMutation, useSendEmailMutation
+} from '@/services/email/useEmailMutations';
 
 interface ComposeEmailProps {
     onClose: () => void;
@@ -66,7 +68,6 @@ export default function ComposeEmail({ onClose, mode, replyTo }: ComposeEmailPro
             if (composeHtml) formData.append('htmlBody', composeHtml);
             if (replyTo?.threadId) formData.append('threadId', replyTo.threadId);
             files.forEach((file) => formData.append('files', file));
-            console.log("🚀 ~ handleSend ~ formData:", [...formData.entries()]);
 
             sendEmail(formData, {
                 onSuccess: () => onClose(),

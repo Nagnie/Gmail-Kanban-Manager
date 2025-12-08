@@ -15,6 +15,10 @@ import {
   BatchMoveEmailDto,
   BatchMoveEmailResponseDto,
 } from './dto/batch-move-email.dto';
+import {
+  ReorderEmailsDto,
+  ReorderEmailsResponseDto,
+} from './dto/reorder-email.dto';
 
 @Injectable()
 export class KanbanService {
@@ -317,6 +321,38 @@ export class KanbanService {
       moved,
       failed,
       results,
+    };
+  }
+
+  async reorderEmails(
+    userId: number,
+    reorderDto: ReorderEmailsDto,
+  ): Promise<ReorderEmailsResponseDto> {
+    if (reorderDto.columnId === KanbanColumnId.INBOX) {
+      throw new BadRequestException(
+        'Inbox emails cannot be reordered manually. ' +
+          'They are automatically sorted by date (newest first). ' +
+          'To prioritize emails, use the Pin feature or move them to "To Do" column.',
+      );
+    }
+
+    await Promise.all(
+      reorderDto.emails.map(async (emailOrder) => {
+        await this.orderRepository.upsert(
+          {
+            userId,
+            emailId: emailOrder.emailId,
+            columnId: reorderDto.columnId,
+            order: emailOrder.order,
+          },
+          ['userId', 'emailId', 'columnId'],
+        );
+      }),
+    );
+
+    return {
+      success: true,
+      message: `Reordered ${reorderDto.emails.length} emails in ${reorderDto.columnId}`,
     };
   }
 

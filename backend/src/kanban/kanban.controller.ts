@@ -15,6 +15,7 @@ import { KanbanColumnId } from './dto/kanban-column.dto';
 import { GetColumnQueryDto } from './dto/get-column.dto';
 import { MoveEmailDto } from './dto/move-email.dto';
 import { BatchMoveEmailDto } from './dto/batch-move-email.dto';
+import { ReorderEmailsDto } from './dto/reorder-email.dto';
 
 @Controller('emails/kanban')
 @UseGuards(AtGuard)
@@ -71,5 +72,14 @@ export class KanbanController {
   })
   async batchMoveEmails(@Req() req, @Body() batchDto: BatchMoveEmailDto) {
     return this.kanbanService.batchMoveEmails(req.user.sub, batchDto);
+  }
+
+  @Post('reorder')
+  @ApiSecurity('jwt')
+  @ApiOperation({
+    summary: 'Reorder emails within column',
+  })
+  async reorderEmails(@Req() req, @Body() reorderDto: ReorderEmailsDto) {
+    return this.kanbanService.reorderEmails(req.user.sub, reorderDto);
   }
 }

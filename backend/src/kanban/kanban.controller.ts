@@ -183,7 +183,7 @@ export class KanbanController {
   })
   async batchSummarize(@Req() req, @Body() dto: BatchSummarizeDto) {
     if (dto.emailIds.length > 50) {
-      throw new BadRequestException('Maximum 50 emails per batch');
+      throw new BadRequestException('Maximum 10 emails per batch');
     }
 
     return this.kanbanService.batchSummarizeEmails(req.user.sub, dto);

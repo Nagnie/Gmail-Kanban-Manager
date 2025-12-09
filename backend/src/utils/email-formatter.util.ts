@@ -1,10 +1,3 @@
-import striptags from "striptags";
-
-export function stripHtmlTags(html: string): string {
-  if (!html) return '';
-  return striptags(html).replace(/\s+/g, ' ').trim();
-}
-
 export function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')

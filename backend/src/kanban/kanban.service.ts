@@ -1,3 +1,4 @@
+import { OpenRouterService } from './../open-router/open-router.service';
 import {
   BadRequestException,
   Injectable,
@@ -7,7 +8,7 @@ import { KanbanColumnDto, KanbanColumnId } from './dto/kanban-column.dto';
 import { GetColumnQueryDto } from './dto/get-column.dto';
 import { GmailService } from '../gmail/gmail.service';
 import { EmailCardDto } from './dto/email-card.dto';
-import { parseEmailDetail } from '../utils/email.util';
+import { parseEmailDetail, prepareEmailToSummarize } from '../utils/email.util';
 import { In, Repository } from 'typeorm';
 import { EmailPriority } from '../email/entities/email-priority.entity';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -57,6 +58,8 @@ export class KanbanService {
     private readonly snoozeRepository: Repository<EmailSnooze>,
 
     private readonly snoozeService: SnoozeService,
+
+    private readonly OpenRouterService: OpenRouterService
   ) {}
 
   getColumnsMetadata() {
@@ -625,28 +628,23 @@ export class KanbanService {
       throw new NotFoundException('Email not found');
     }
 
-    const parsed = parseEmailDetail(message);
-    // const emailBody =
-    //   parsed.body.textBody ||
-    //   parsed.body.htmlBody ||
-    //   parsed.snippet ||
-    //   'No content';
+    const parsedEmail = parseEmailDetail(message);
+    const aiInput = prepareEmailToSummarize(parsedEmail);
+    console.log(aiInput);
 
-    // TODO: add aiService to handle AI interactions
-    // const summary = await this.aiService.summarizeEmail(emailBody);
-    const summary = `[Simulated Summary] ${parsed.snippet.slice(0, 100)}...`;
+    const summary = await this.OpenRouterService.summarizeEmail(aiInput);
 
-    const savedSummary = await this.summaryRepository.save({
+    await this.summaryRepository.upsert({
       userId,
       emailId,
       summary,
-    });
+    }, ['userId', 'emailId']);
 
     return {
       emailId,
-      summary: savedSummary.summary,
+      summary,
       fromDatabase: false,
-      summarizedAt: savedSummary.createdAt.toISOString(),
+      summarizedAt: new Date().toISOString()
     };
   }
 

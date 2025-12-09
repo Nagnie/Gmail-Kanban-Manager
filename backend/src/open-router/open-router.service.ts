@@ -2,7 +2,6 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigType } from '@nestjs/config';
 import OpenAI from 'openai';
 import openRouterConfig from 'src/config/open-router.config';
-import { stripHtmlTags } from 'src/utils/email-formatter.util';
 
 @Injectable()
 export class OpenRouterService {
@@ -46,9 +45,7 @@ export class OpenRouterService {
     }
 
     async summarizeEmail(emailBody: string): Promise<string> {
-        const cleanText = stripHtmlTags(emailBody);
-
-        const truncatedText = cleanText.substring(0, 4000);
+        const truncatedText = emailBody.substring(0, 4000);
 
         const systemPrompt = `
             You are an expert personal assistant. 
@@ -56,13 +53,14 @@ export class OpenRouterService {
             - Focus on the main intent, action items, and deadlines.
             - Ignore signatures, disclaimers, and marketing fluff.
             - If the email is in Vietnamese, summarize in Vietnamese. If English, summarize in English.
+            - Just provide the summary without any additional commentary.
         `;
 
-        return this.getChatCompletion(systemPrompt, truncatedText, 0.1, 200);
+        return this.getChatCompletion(systemPrompt, truncatedText, 0.3, 200);
     }
 
     async extractActionItems(emailBody: string): Promise<string> {
-        const cleanText = stripHtmlTags(emailBody).substring(0, 4000);
+        const cleanText = emailBody.substring(0, 4000);
         const systemPrompt = `Extract action items as a JSON list.`;
         return this.getChatCompletion(systemPrompt, cleanText, 0.1, 200);
     }

@@ -8,7 +8,11 @@ import { KanbanColumnDto, KanbanColumnId } from './dto/kanban-column.dto';
 import { GetColumnQueryDto } from './dto/get-column.dto';
 import { GmailService } from '../gmail/gmail.service';
 import { EmailCardDto } from './dto/email-card.dto';
-import { parseEmailDetail, prepareEmailToSummarize } from '../utils/email.util';
+import {
+  getHeaderValue,
+  parseEmailDetail,
+  prepareEmailToSummarize,
+} from '../utils/email.util';
 import { In, Repository } from 'typeorm';
 import { EmailPriority } from '../email/entities/email-priority.entity';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -39,6 +43,7 @@ import {
   SummarizeResponseDto,
   SummaryStatsDto,
 } from 'src/kanban/dto/summarize-email.dto';
+import { EmailSummaryDto } from 'src/mailbox/dto/email-summary.dto';
 
 @Injectable()
 export class KanbanService {
@@ -59,7 +64,7 @@ export class KanbanService {
 
     private readonly snoozeService: SnoozeService,
 
-    private readonly OpenRouterService: OpenRouterService
+    private readonly OpenRouterService: OpenRouterService,
   ) {}
 
   getColumnsMetadata() {
@@ -449,9 +454,41 @@ export class KanbanService {
   async getSnoozedEmails(userId: number): Promise<SnoozeResponseDto[]> {
     const snoozes = await this.snoozeService.findSnoozedEmails(userId);
 
+    const call = snoozes?.map(async (snooze) => {
+      const fullMessage = await this.gmailService.getEmailMetadata(
+        userId,
+        snooze.emailId,
+      );
+
+      const { payload, ...rest } = fullMessage;
+
+      const rawHeaders = payload?.headers || [];
+      const headers = {
+        subject: getHeaderValue(rawHeaders, 'Subject') || '',
+        from: (getHeaderValue(rawHeaders, 'From') || '').split('<')[0].trim(),
+        to: getHeaderValue(rawHeaders, 'To') || '',
+        date: getHeaderValue(rawHeaders, 'Date') || '',
+      };
+
+      const isUnread = fullMessage.labelIds?.includes('UNREAD') || false;
+      const isStarred = fullMessage.labelIds?.includes('STARRED') || false;
+      const isImportant = fullMessage.labelIds?.includes('IMPORTANT') || false;
+
+      return {
+        ...rest,
+        header: headers,
+        isUnread,
+        isStarred,
+        isImportant,
+      } as EmailSummaryDto;
+    });
+
+    const detailedEmails = await Promise.all(call || []);
+
     return snoozes.map((snooze) => ({
       id: snooze.id,
       emailId: snooze.emailId,
+      emailInfo: detailedEmails.find((e) => e.id === snooze.emailId)!,
       originalColumn: snooze.originalColumn,
       snoozeUntil: snooze.snoozeUntil.toISOString(),
       isRestored: snooze.isRestored,
@@ -634,17 +671,20 @@ export class KanbanService {
 
     const summary = await this.OpenRouterService.summarizeEmail(aiInput);
 
-    await this.summaryRepository.upsert({
-      userId,
-      emailId,
-      summary,
-    }, ['userId', 'emailId']);
+    await this.summaryRepository.upsert(
+      {
+        userId,
+        emailId,
+        summary,
+      },
+      ['userId', 'emailId'],
+    );
 
     return {
       emailId,
       summary,
       fromDatabase: false,
-      summarizedAt: new Date().toISOString()
+      summarizedAt: new Date().toISOString(),
     };
   }
 

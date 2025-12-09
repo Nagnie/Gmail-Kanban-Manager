@@ -91,7 +91,13 @@ export class SnoozeService {
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const days = Math.floor(hours / 24);
 
-    const formatter = new Intl.DateTimeFormat('en-US', {
+    const timeFormatter = new Intl.DateTimeFormat('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+
+    const fullFormatter = new Intl.DateTimeFormat('en-US', {
       weekday: 'long',
       hour: 'numeric',
       minute: '2-digit',
@@ -99,11 +105,11 @@ export class SnoozeService {
     });
 
     if (hours < 24) {
-      return `Snoozed until today at ${formatter.format(snoozeUntil).split(', ')[1]}`;
+      return `Snoozed until today at ${timeFormatter.format(snoozeUntil)}`;
     } else if (days === 1) {
-      return `Snoozed until tomorrow at ${formatter.format(snoozeUntil).split(', ')[1]}`;
+      return `Snoozed until tomorrow at ${timeFormatter.format(snoozeUntil)}`;
     } else if (days < 7) {
-      return `Snoozed until ${formatter.format(snoozeUntil)}`;
+      return `Snoozed until ${fullFormatter.format(snoozeUntil)}`;
     } else {
       return `Snoozed until ${snoozeUntil.toLocaleDateString('en-US', {
         month: 'short',

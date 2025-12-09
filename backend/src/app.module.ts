@@ -13,6 +13,8 @@ import { MailboxModule } from './mailbox/mailbox.module';
 import { EmailModule } from './email/email.module';
 import { AttachmentModule } from './attachment/attachment.module';
 import { ThreadModule } from './thread/thread.module';
+import { OpenRouterModule } from './open-router/open-router.module';
+import openRouterConfig from './config/open-router.config';
 import { KanbanModule } from './kanban/kanban.module';
 import { CacheModule } from '@nestjs/cache-manager';
 import { SnoozeModule } from './snooze/snooze.module';
@@ -22,7 +24,7 @@ import { ScheduleModule } from '@nestjs/schedule';
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [databaseConfig, jwtConfig, googleOauthConfig],
+      load: [databaseConfig, jwtConfig, googleOauthConfig, openRouterConfig],
     }),
     ScheduleModule.forRoot(),
     // Cache Module (global)
@@ -54,6 +56,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     EmailModule,
     AttachmentModule,
     ThreadModule,
+    OpenRouterModule,
     KanbanModule,
     SnoozeModule,
   ],

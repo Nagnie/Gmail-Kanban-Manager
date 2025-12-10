@@ -1,18 +1,21 @@
-import { EyeOff, Grip, Star } from "lucide-react";
+import { EyeOff, Grip, Loader2, Sparkles, Star } from "lucide-react";
 
-import { extractSenderName, formatDateShort, getAISummary } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { formatDateShort } from "@/lib/utils";
 import { useDraggable } from "@dnd-kit/core";
 
-import { Button } from "../../../components/ui/button";
-
-import type { EmailMessage } from "@/services/mailboxes";
+import type { EmailCardDto } from "@/services/kanban/types";
 export const DraggableEmailCard = ({
   email,
   onHide,
+  onSummarize,
+  isSummarizing,
   source,
 }: {
-  email: EmailMessage;
+  email: EmailCardDto;
   onHide?: (id: string) => void;
+  onSummarize?: (id: string) => void;
+  isSummarizing?: boolean;
   source: string | "inbox";
 }) => {
   const { attributes, listeners, setNodeRef, transform, isDragging } =
@@ -46,8 +49,7 @@ export const DraggableEmailCard = ({
           <div className='flex-1 min-w-0'>
             <div className='flex items-center gap-2'>
               <span className='text-xs font-medium text-muted-foreground truncate'>
-                {email.participantEmails ||
-                  extractSenderName(email.header.from)}
+                {email.fromName || email.from}
               </span>
               {email.isStarred && (
                 <Star className='w-3 h-3 fill-yellow-400 text-yellow-400 flex-shrink-0' />
@@ -58,7 +60,7 @@ export const DraggableEmailCard = ({
                 email.isUnread ? "font-bold" : "font-medium"
               }`}
             >
-              {email.header.subject}
+              {email.subject}
             </h4>
           </div>
         </div>
@@ -82,20 +84,41 @@ export const DraggableEmailCard = ({
           <div className='bg-blue-500 text-white text-xs font-semibold px-2 py-1 rounded flex-shrink-0'>
             AI
           </div>
-          <p className='text-xs text-foreground leading-relaxed line-clamp-3'>
-            {getAISummary(email.snippet)}
-          </p>
+          {email.summary ? (
+            <p className='text-xs text-foreground leading-relaxed line-clamp-3'>
+              {email.summary}
+            </p>
+          ) : (
+            <div className='flex-1 flex items-center justify-between'>
+              <p className='text-xs text-muted-foreground leading-relaxed line-clamp-1 italic'>
+                {email.snippet}
+              </p>
+              {onSummarize && (
+                <Button
+                  variant='ghost'
+                  size='sm'
+                  className='h-6 px-2 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900'
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSummarize(email.id);
+                  }}
+                  disabled={isSummarizing}
+                >
+                  {isSummarizing ? (
+                    <Loader2 className='w-3 h-3 animate-spin' />
+                  ) : (
+                    <Sparkles className='w-3 h-3' />
+                  )}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
       <div className='flex items-center justify-between text-xs text-muted-foreground'>
-        <span>{formatDateShort(email.header.date)}</span>
+        <span>{formatDateShort(email.date)}</span>
         <div className='flex items-center gap-2'>
-          {email.messageCount !== undefined && email.messageCount > 1 && (
-            <span className='bg-sidebar-border px-2 py-1 rounded-full'>
-              {email.messageCount}
-            </span>
-          )}
           {email.isUnread && (
             <span className='bg-blue-500 text-white px-2 py-1 rounded-full font-medium'>
               New

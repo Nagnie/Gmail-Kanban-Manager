@@ -1,5 +1,6 @@
 import {
   Archive,
+  ArrowUpDown,
   CheckCircle,
   ChevronLeft,
   ChevronRight,
@@ -9,11 +10,14 @@ import {
   Inbox,
   Loader2,
   Mail,
+  MailOpen,
+  Paperclip,
   RefreshCw,
   Search,
+  SlidersHorizontal,
   X,
 } from "lucide-react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,6 +51,7 @@ import type {
   KanbanColumnId,
   SnoozeResponseDto,
 } from "@/services/kanban/types";
+
 const KanbanBoard = () => {
   const queryClient = useQueryClient();
 
@@ -85,13 +90,25 @@ const KanbanBoard = () => {
 
   const [hiddenEmails, setHiddenEmails] = useState<SnoozeResponseDto[]>([]);
   const [activeEmail, setActiveEmail] = useState<EmailCardDto | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery] = useState("");
+  const [fuzzySearchQuery, setFuzzySearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<EmailCardDto[]>([]);
+  const [showSearchResults, setShowSearchResults] = useState(false);
   const [selectedFolder] = useState("INBOX");
   const [showInboxPanel, setShowInboxPanel] = useState(true);
   const [showHiddenPanel, setShowHiddenPanel] = useState(false);
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [processedEmailIds, setProcessedEmailIds] = useState<Set<string>>(
     new Set()
   );
+
+  // Filter & Sort states
+  const [sortBy, setSortBy] = useState<"date-desc" | "date-asc" | "sender">(
+    "date-desc"
+  );
+  const [filterUnread, setFilterUnread] = useState(false);
+  const [filterAttachments, setFilterAttachments] = useState(false);
 
   const { data: todoData, isLoading: isLoadingTodo } = useKanbanColumn("todo");
   const { data: inProgressData, isLoading: isLoadingInProgress } =
@@ -155,11 +172,8 @@ const KanbanBoard = () => {
     setProcessedEmailIds(processed);
   }, [todoData, inProgressData, doneData]);
 
-  // Cập nhật snoozed emails
   useEffect(() => {
     if (snoozedData) {
-      // Map SnoozeResponseDto[] sang EmailCardDto[] nếu cần
-      // hoặc giữ nguyên tùy structure
       setHiddenEmails(
         snoozedData.map((s) => {
           const info = s.emailInfo;
@@ -185,7 +199,61 @@ const KanbanBoard = () => {
   const inboxEmails = (inboxData?.emails || []).filter(
     (email: EmailCardDto) => !processedEmailIds.has(email.id)
   );
-  console.log("🚀 ~ KanbanBoard ~ inboxEmails:", inboxEmails);
+
+  // Apply filters and sorting
+  const applyFiltersAndSort = (emails: EmailCardDto[]) => {
+    let filtered = [...emails];
+
+    // Apply filters
+    if (filterUnread) {
+      filtered = filtered.filter((email) => email.isUnread);
+    }
+    if (filterAttachments) {
+      filtered = filtered.filter((email) => email.hasAttachments);
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case "date-desc":
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        case "date-asc":
+          return new Date(a.date).getTime() - new Date(b.date).getTime();
+        case "sender":
+          return (a.fromName || a.from || "").localeCompare(
+            b.fromName || b.from || ""
+          );
+        default:
+          return 0;
+      }
+    });
+
+    return filtered;
+  };
+
+  // Filtered columns
+  const filteredColumns = useMemo(
+    () => ({
+      TODO: {
+        ...columns.TODO,
+        emails: applyFiltersAndSort(columns.TODO.emails),
+      },
+      IN_PROGRESS: {
+        ...columns.IN_PROGRESS,
+        emails: applyFiltersAndSort(columns.IN_PROGRESS.emails),
+      },
+      DONE: {
+        ...columns.DONE,
+        emails: applyFiltersAndSort(columns.DONE.emails),
+      },
+    }),
+    [columns, sortBy, filterUnread, filterAttachments]
+  );
+
+  const filteredInboxEmails = useMemo(
+    () => applyFiltersAndSort(inboxEmails),
+    [inboxEmails, sortBy, filterUnread, filterAttachments]
+  );
 
   const handleSummarizeEmail = (emailId: string) => {
     setSummarizingId(emailId);
@@ -209,6 +277,41 @@ const KanbanBoard = () => {
     );
   };
 
+  // Fuzzy search handler
+  const handleFuzzySearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!fuzzySearchQuery.trim()) return;
+
+    setIsSearching(true);
+
+    // Simulate fuzzy search on all emails
+    setTimeout(() => {
+      const allEmails = [
+        ...filteredInboxEmails,
+        ...filteredColumns.TODO.emails,
+        ...filteredColumns.IN_PROGRESS.emails,
+        ...filteredColumns.DONE.emails,
+      ];
+
+      const query = fuzzySearchQuery.toLowerCase();
+      const results = allEmails.filter((email) => {
+        const searchText =
+          `${email.subject} ${email.from} ${email.fromName} ${email.snippet}`.toLowerCase();
+        return searchText.includes(query);
+      });
+
+      setSearchResults(results);
+      setShowSearchResults(true);
+      setIsSearching(false);
+    }, 300);
+  };
+
+  const clearSearch = () => {
+    setFuzzySearchQuery("");
+    setSearchResults([]);
+    setShowSearchResults(false);
+  };
+
   const isLoading =
     isLoadingTodo || isLoadingInProgress || isLoadingDone || isLoadingInbox;
 
@@ -219,6 +322,7 @@ const KanbanBoard = () => {
       setActiveEmail(email);
     }
   };
+
   const handleDragEnd = (event: any) => {
     const { active, over } = event;
     setActiveEmail(null);
@@ -233,7 +337,6 @@ const KanbanBoard = () => {
 
     if (source === targetColumnId) return;
 
-    // Map column IDs sang đúng format của API
     const columnIdMap: Record<string, KanbanColumnId> = {
       inbox: "inbox",
       TODO: "todo",
@@ -244,7 +347,6 @@ const KanbanBoard = () => {
     const sourceColumnApi = columnIdMap[source as string] || source;
     const targetColumnApi = columnIdMap[targetColumnId] || targetColumnId;
 
-    // Optimistic update UI
     const newColumns = {
       TODO: { ...columns.TODO, emails: [...columns.TODO.emails] },
       IN_PROGRESS: {
@@ -272,7 +374,6 @@ const KanbanBoard = () => {
     setColumns(newColumns);
     setProcessedEmailIds((prev) => new Set(prev).add(email.id));
 
-    // Call API
     moveEmail(
       {
         emailId: email.id,
@@ -284,7 +385,6 @@ const KanbanBoard = () => {
       {
         onError: (error) => {
           console.error("Failed to move email:", error);
-          // Revert optimistic update
           queryClient.invalidateQueries({ queryKey: kanbanKeys.columns() });
         },
       }
@@ -292,24 +392,23 @@ const KanbanBoard = () => {
   };
 
   const handleHideEmail = (emailId: string) => {
-    const email = inboxEmails.find((e: EmailCardDto) => e.id === emailId);
+    const email = filteredInboxEmails.find(
+      (e: EmailCardDto) => e.id === emailId
+    );
     if (email) {
-      // Optimistic update
       setHiddenEmails((prev) => [...prev, email as any]);
       setProcessedEmailIds((prev) => new Set(prev).add(emailId));
 
-      // Call API - snooze với preset
       snoozeEmailMutation(
         {
           emailId,
           snoozeDto: {
-            preset: "tomorrow", // hoặc cho user chọn preset
+            preset: "tomorrow",
           },
         },
         {
           onError: (error) => {
             console.error("Failed to snooze email:", error);
-            // Revert nếu lỗi
             setHiddenEmails((prev) => prev.filter((e) => e.id !== emailId));
             setProcessedEmailIds((prev) => {
               const newSet = new Set(prev);
@@ -353,7 +452,6 @@ const KanbanBoard = () => {
     );
   }
 
-  console.log("🚀 ~ KanbanBoard ~ hiddenEmails:", hiddenEmails);
   return (
     <DndContext
       sensors={sensors}
@@ -364,18 +462,52 @@ const KanbanBoard = () => {
       <div className='h-[calc(100vh-64px)] flex flex-col bg-background'>
         {/* Header */}
         <div className='bg-card border-b px-6 py-4'>
-          <div className='flex items-center justify-between'>
-            <div className='flex items-center gap-3'>
-              <div className='relative'>
+          <div className='flex items-center justify-between gap-3'>
+            <div className='flex items-center gap-3 flex-1'>
+              {/* Fuzzy Search Bar */}
+              <form
+                onSubmit={handleFuzzySearch}
+                className='relative flex-1 max-w-md'
+              >
                 <Search className='absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground' />
                 <Input
                   type='text'
-                  placeholder='Search emails...'
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className='pl-10 w-64'
+                  placeholder='Search all emails...'
+                  value={fuzzySearchQuery}
+                  onChange={(e) => setFuzzySearchQuery(e.target.value)}
+                  className='pl-10 pr-10'
                 />
-              </div>
+                {fuzzySearchQuery && (
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    size='icon'
+                    className='absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7'
+                    onClick={clearSearch}
+                  >
+                    <X className='w-4 h-4' />
+                  </Button>
+                )}
+              </form>
+
+              <Button
+                variant='outline'
+                size='sm'
+                onClick={() => setShowFilterPanel(!showFilterPanel)}
+                className='cursor-pointer'
+              >
+                <SlidersHorizontal className='w-4 h-4 mr-2' />
+                Filters
+                {(filterUnread || filterAttachments) && (
+                  <Badge
+                    variant='destructive'
+                    className='ml-2 h-5 w-5 p-0 text-xs'
+                  >
+                    {(filterUnread ? 1 : 0) + (filterAttachments ? 1 : 0)}
+                  </Badge>
+                )}
+              </Button>
+
               <Button
                 variant='outline'
                 size='sm'
@@ -385,6 +517,7 @@ const KanbanBoard = () => {
                 <Eye className='w-4 h-4 mr-2' />
                 Hidden ({hiddenEmails.length})
               </Button>
+
               <Button
                 variant='outline'
                 size='sm'
@@ -397,12 +530,189 @@ const KanbanBoard = () => {
                 />
                 Refresh
               </Button>
+
               {isFetchingEmails && (
                 <Loader2 className='w-4 h-4 animate-spin text-muted-foreground' />
               )}
             </div>
           </div>
         </div>
+
+        {/* Filter Panel */}
+        {showFilterPanel && (
+          <div className='bg-card border-b px-6 py-3'>
+            <div className='flex items-center gap-4'>
+              <div className='flex items-center gap-2'>
+                <ArrowUpDown className='w-4 h-4 text-muted-foreground' />
+                <span className='text-sm font-medium'>Sort:</span>
+                <Button
+                  variant={sortBy === "date-desc" ? "secondary" : "ghost"}
+                  size='sm'
+                  onClick={() => setSortBy("date-desc")}
+                  className='cursor-pointer'
+                >
+                  Newest First
+                </Button>
+                <Button
+                  variant={sortBy === "date-asc" ? "secondary" : "ghost"}
+                  size='sm'
+                  onClick={() => setSortBy("date-asc")}
+                  className='cursor-pointer'
+                >
+                  Oldest First
+                </Button>
+                <Button
+                  variant={sortBy === "sender" ? "secondary" : "ghost"}
+                  size='sm'
+                  onClick={() => setSortBy("sender")}
+                  className='cursor-pointer'
+                >
+                  By Sender
+                </Button>
+              </div>
+
+              <div className='h-6 w-px bg-border' />
+
+              <div className='flex items-center gap-2'>
+                <span className='text-sm font-medium'>Filter:</span>
+                <Button
+                  variant={filterUnread ? "secondary" : "ghost"}
+                  size='sm'
+                  onClick={() => setFilterUnread(!filterUnread)}
+                  className='cursor-pointer'
+                >
+                  <MailOpen className='w-4 h-4 mr-2' />
+                  Unread Only
+                </Button>
+                <Button
+                  variant={filterAttachments ? "secondary" : "ghost"}
+                  size='sm'
+                  onClick={() => setFilterAttachments(!filterAttachments)}
+                  className='cursor-pointer'
+                >
+                  <Paperclip className='w-4 h-4 mr-2' />
+                  Has Attachments
+                </Button>
+              </div>
+
+              {(filterUnread ||
+                filterAttachments ||
+                sortBy !== "date-desc") && (
+                <>
+                  <div className='h-6 w-px bg-border' />
+                  <Button
+                    variant='ghost'
+                    size='sm'
+                    onClick={() => {
+                      setSortBy("date-desc");
+                      setFilterUnread(false);
+                      setFilterAttachments(false);
+                    }}
+                    className='cursor-pointer'
+                  >
+                    <X className='w-4 h-4 mr-2' />
+                    Clear All
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Search Results View */}
+        {showSearchResults && (
+          <div className='absolute inset-0 z-50 bg-background'>
+            <div className='h-full flex flex-col'>
+              <div className='bg-card border-b px-6 py-4 flex items-center justify-between'>
+                <div className='flex items-center gap-3'>
+                  <Button
+                    variant='ghost'
+                    size='icon'
+                    onClick={clearSearch}
+                    className='cursor-pointer'
+                  >
+                    <ChevronLeft className='w-4 h-4' />
+                  </Button>
+                  <h2 className='text-lg font-semibold'>Search Results</h2>
+                  <Badge variant='secondary'>
+                    {searchResults.length} found
+                  </Badge>
+                </div>
+                <Button
+                  variant='ghost'
+                  size='sm'
+                  onClick={clearSearch}
+                  className='cursor-pointer'
+                >
+                  Close
+                </Button>
+              </div>
+
+              <div className='flex-1 overflow-y-auto p-6'>
+                {isSearching ? (
+                  <div className='flex flex-col items-center justify-center py-12'>
+                    <Loader2 className='w-12 h-12 mb-4 animate-spin text-muted-foreground' />
+                    <p className='text-muted-foreground'>Searching...</p>
+                  </div>
+                ) : searchResults.length === 0 ? (
+                  <div className='flex flex-col items-center justify-center py-12'>
+                    <Search className='w-12 h-12 mb-4 text-muted-foreground opacity-50' />
+                    <p className='text-lg font-medium mb-2'>No results found</p>
+                    <p className='text-sm text-muted-foreground'>
+                      Try searching with different keywords
+                    </p>
+                  </div>
+                ) : (
+                  <div className='max-w-4xl mx-auto space-y-3'>
+                    {searchResults.map((email) => (
+                      <div
+                        key={email.id}
+                        className='bg-card rounded-lg border p-4 hover:shadow-md transition-shadow'
+                      >
+                        <div className='flex items-start justify-between gap-4'>
+                          <div className='flex-1 min-w-0'>
+                            <div className='flex items-center gap-2 mb-1'>
+                              <span className='font-medium text-sm truncate'>
+                                {email.fromName || email.from}
+                              </span>
+                              {email.isUnread && (
+                                <Badge
+                                  variant='secondary'
+                                  className='h-5 text-xs'
+                                >
+                                  New
+                                </Badge>
+                              )}
+                              {email.hasAttachments && (
+                                <Paperclip className='w-3 h-3 text-muted-foreground' />
+                              )}
+                            </div>
+                            <h3 className='font-semibold mb-1 truncate'>
+                              {email.subject}
+                            </h3>
+                            <p className='text-sm text-muted-foreground line-clamp-2'>
+                              {email.snippet}
+                            </p>
+                            <p className='text-xs text-muted-foreground mt-2'>
+                              {new Date(email.date).toLocaleString()}
+                            </p>
+                          </div>
+                          <Button
+                            variant='outline'
+                            size='sm'
+                            className='cursor-pointer shrink-0'
+                          >
+                            View
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Main Content */}
         <div className='flex-1 overflow-hidden flex'>
@@ -418,7 +728,9 @@ const KanbanBoard = () => {
                   <div className='flex items-center gap-2'>
                     <Inbox className='w-4 h-4' />
                     <h3 className='font-semibold'>Inbox</h3>
-                    <Badge variant='secondary'>{inboxEmails.length}</Badge>
+                    <Badge variant='secondary'>
+                      {filteredInboxEmails.length}
+                    </Badge>
                   </div>
                   <Button
                     variant='ghost'
@@ -431,16 +743,18 @@ const KanbanBoard = () => {
                 </div>
                 <div className='flex-1 p-4 overflow-y-auto'>
                   <div className='space-y-3'>
-                    {inboxEmails.length === 0 ? (
+                    {filteredInboxEmails.length === 0 ? (
                       <div className='flex flex-col items-center justify-center py-12 text-muted-foreground'>
                         <Mail className='w-12 h-12 mb-2 opacity-50' />
                         <p className='text-sm text-center'>
-                          All emails organized!
+                          {filterUnread || filterAttachments
+                            ? "No emails match filters"
+                            : "All emails organized!"}
                         </p>
                       </div>
                     ) : (
                       <>
-                        {inboxEmails.map((email: any) => (
+                        {filteredInboxEmails.map((email: any) => (
                           <DraggableEmailCard
                             key={email.id}
                             email={email}
@@ -451,7 +765,7 @@ const KanbanBoard = () => {
                           />
                         ))}
                         <div ref={sentinelRef} style={{ height: 32 }}></div>
-                        {isFetchingEmails && inboxEmails.length > 0 && (
+                        {isFetchingEmails && filteredInboxEmails.length > 0 && (
                           <div className='w-full p-4 text-center'>
                             <Loader2 className='w-4 h-4 animate-spin mx-auto text-muted-foreground' />
                           </div>
@@ -481,7 +795,7 @@ const KanbanBoard = () => {
           {/* Kanban Board */}
           <div className='flex-1 overflow-x-auto p-6'>
             <div className='flex gap-6 h-full min-w-max'>
-              {Object.values(columns).map((column) => (
+              {Object.values(filteredColumns).map((column) => (
                 <div
                   key={column.id}
                   className='flex flex-col w-100 bg-sidebar rounded-lg'
@@ -499,7 +813,11 @@ const KanbanBoard = () => {
                       {column.emails.length === 0 ? (
                         <div className='flex flex-col items-center justify-center py-12 text-muted-foreground'>
                           <Mail className='w-12 h-12 mb-2 opacity-50' />
-                          <p className='text-sm'>Drop emails here</p>
+                          <p className='text-sm'>
+                            {filterUnread || filterAttachments
+                              ? "No emails match filters"
+                              : "Drop emails here"}
+                          </p>
                         </div>
                       ) : (
                         column.emails.map((email) => (
@@ -528,14 +846,10 @@ const KanbanBoard = () => {
             } transition-all duration-300 border-l flex flex-col bg-sidebar overflow-hidden`}
             aria-hidden={showHiddenPanel ? "false" : "true"}
           >
-            <div
-              className={`p-4 border-b bg-card flex items-center justify-between transition-opacity duration-200 ${
-                showHiddenPanel ? "opacity-100" : "opacity-0"
-              }`}
-            >
+            <div className='p-4 border-b bg-card flex items-center justify-between'>
               <div className='flex items-center gap-2'>
                 <EyeOff className='w-4 h-4' />
-                <h3 className='font-semibold'>Hidden</h3>
+                <h3 className='font-semibold'>Hidden Emails</h3>
                 <Badge variant='secondary'>{hiddenEmails.length}</Badge>
               </div>
               <Button
@@ -544,15 +858,10 @@ const KanbanBoard = () => {
                 onClick={() => setShowHiddenPanel(false)}
                 className='cursor-pointer'
               >
-                <X className='w-4 h-4' />
+                <ChevronRight className='w-4 h-4' />
               </Button>
             </div>
-
-            <div
-              className={`flex-1 p-4 overflow-y-auto transition-opacity duration-300 ${
-                showHiddenPanel ? "opacity-100" : "opacity-0"
-              }`}
-            >
+            <div className='flex-1 p-4 overflow-y-auto'>
               <div className='space-y-3'>
                 {hiddenEmails.length === 0 ? (
                   <div className='flex flex-col items-center justify-center py-12 text-muted-foreground'>

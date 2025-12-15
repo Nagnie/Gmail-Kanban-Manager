@@ -15,7 +15,7 @@ export class GmailService {
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
-  private async getAuthenticatedGmailClient(userId: number) {
+  public async getAuthenticatedGmailClient(userId: number) {
     const user = await this.userService.findOne(userId);
 
     if (!user.googleRefreshToken) {

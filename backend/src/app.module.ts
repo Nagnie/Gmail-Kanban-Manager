@@ -19,6 +19,7 @@ import { KanbanModule } from './kanban/kanban.module';
 import { CacheModule } from '@nestjs/cache-manager';
 import { SnoozeModule } from './snooze/snooze.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
   imports: [
@@ -48,6 +49,15 @@ import { ScheduleModule } from '@nestjs/schedule';
         synchronize: false,
         logging: ['error'],
       }),
+    }),
+    EventEmitterModule.forRoot({
+      wildcard: false,
+      delimiter: '.',
+      newListener: false,
+      removeListener: false,
+      maxListeners: 10,
+      verboseMemoryLeak: false,
+      ignoreErrors: false,
     }),
     UserModule,
     AuthModule,

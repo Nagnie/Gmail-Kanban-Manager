@@ -18,11 +18,7 @@ type ColumnFilterMenuProps = {
     onChange: (next: ColumnSettings) => void;
 };
 
-export const ColumnFilterMenu: React.FC<ColumnFilterMenuProps> = ({
-    columnId,
-    settings,
-    onChange,
-}) => {
+export const ColumnFilterMenu: React.FC<ColumnFilterMenuProps> = ({ settings, onChange }) => {
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>

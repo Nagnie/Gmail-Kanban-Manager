@@ -136,8 +136,9 @@ const KanbanBoard = () => {
     const [hiddenEmails, setHiddenEmails] = useState<SnoozeResponseDto[]>([]);
     const [activeEmail, setActiveEmail] = useState<EmailCardDto | null>(null);
     const [searchQuery] = useState("");
-    const [fuzzySearchQuery, setFuzzySearchQuery] = useState("");
-    const [isSearching, setIsSearching] = useState(false);
+    // const [fuzzySearchQuery, setFuzzySearchQuery] = useState("");
+    // const [isSearching, setIsSearching] = useState(false);
+    const [isSearching] = useState(false);
     const [searchResults, setSearchResults] = useState<EmailCardDto[]>([]);
     const [showSearchResults, setShowSearchResults] = useState(false);
     const [selectedFolder] = useState("INBOX");
@@ -147,9 +148,11 @@ const KanbanBoard = () => {
     const [processedEmailIds, setProcessedEmailIds] = useState<Set<string>>(new Set());
 
     // Filter & Sort states
-    const [sortBy, setSortBy] = useState<"date-desc" | "date-asc" | "sender">("date-desc");
-    const [filterUnread, setFilterUnread] = useState(false);
-    const [filterAttachments, setFilterAttachments] = useState(false);
+    // const [sortBy, setSortBy] = useState<"date-desc" | "date-asc" | "sender">("date-desc");
+    // const [filterUnread, setFilterUnread] = useState(false);
+    // const [filterAttachments, setFilterAttachments] = useState(false);
+    const [filterUnread] = useState(false);
+    const [filterAttachments] = useState(false);
 
     const { data: todoData, isLoading: isLoadingTodo } = useKanbanColumn("todo");
     const { data: inProgressData, isLoading: isLoadingInProgress } = useKanbanColumn("in_progress");
@@ -375,36 +378,36 @@ const KanbanBoard = () => {
     };
 
     // Fuzzy search handler
-    const handleFuzzySearch = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!fuzzySearchQuery.trim()) return;
+    // const handleFuzzySearch = (e: React.FormEvent) => {
+    //     e.preventDefault();
+    //     if (!fuzzySearchQuery.trim()) return;
 
-        setIsSearching(true);
+    //     setIsSearching(true);
 
-        // Simulate fuzzy search on all emails
-        setTimeout(() => {
-            const allEmails = [
-                ...filteredInboxEmails,
-                ...filteredColumns.TODO.emails,
-                ...filteredColumns.IN_PROGRESS.emails,
-                ...filteredColumns.DONE.emails,
-            ];
+    //     // Simulate fuzzy search on all emails
+    //     setTimeout(() => {
+    //         const allEmails = [
+    //             ...filteredInboxEmails,
+    //             ...filteredColumns.TODO.emails,
+    //             ...filteredColumns.IN_PROGRESS.emails,
+    //             ...filteredColumns.DONE.emails,
+    //         ];
 
-            const query = fuzzySearchQuery.toLowerCase();
-            const results = allEmails.filter((email) => {
-                const searchText =
-                    `${email.subject} ${email.from} ${email.fromName} ${email.snippet}`.toLowerCase();
-                return searchText.includes(query);
-            });
+    //         const query = fuzzySearchQuery.toLowerCase();
+    //         const results = allEmails.filter((email) => {
+    //             const searchText =
+    //                 `${email.subject} ${email.from} ${email.fromName} ${email.snippet}`.toLowerCase();
+    //             return searchText.includes(query);
+    //         });
 
-            setSearchResults(results);
-            setShowSearchResults(true);
-            setIsSearching(false);
-        }, 300);
-    };
+    //         setSearchResults(results);
+    //         setShowSearchResults(true);
+    //         setIsSearching(false);
+    //     }, 300);
+    // };
 
     const clearSearch = () => {
-        setFuzzySearchQuery("");
+        // setFuzzySearchQuery("");
         setSearchResults([]);
         setShowSearchResults(false);
     };
@@ -542,7 +545,7 @@ const KanbanBoard = () => {
 
     const handleViewAllSearch = (query: string) => {
         // Navigate to full search page
-        setFuzzySearchQuery(query);
+        // setFuzzySearchQuery(query);
         setShowSearchResults(true);
 
         navigate(`/search?q=${encodeURIComponent(query)}&from=kanban`);

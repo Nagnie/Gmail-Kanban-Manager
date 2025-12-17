@@ -72,4 +72,13 @@ export class GetColumnQueryDto {
   @IsBoolean()
   @Type(() => Boolean)
   isImportant?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Sort order by date',
+    enum: ['newest', 'oldest'],
+    example: 'newest',
+  })
+  @IsOptional()
+  @IsString()
+  sortBy?: 'newest' | 'oldest';
 }

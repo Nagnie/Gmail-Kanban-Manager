@@ -169,12 +169,28 @@ export class KanbanService {
       };
     });
 
+    const filteredCards = cardsWithMetadata.filter((card) => {
+      let isValid = true;
+
+      if (query.hasAttachments !== undefined) {
+        const hasAttachments = card.hasAttachments;
+        isValid = isValid && query.hasAttachments === hasAttachments;
+      }
+
+      if (query.isUnread !== undefined) {
+        const isUnread = card.labelIds && card.labelIds.includes('UNREAD');
+        isValid = isValid && query.isUnread === isUnread;
+      }
+
+      return isValid;
+    });
+
     let sortedCards: EmailCardDto[];
     let pinnedCount = 0;
 
     if (columnId === KanbanColumnId.INBOX) {
-      const pinned = cardsWithMetadata.filter((c) => c.isPinned);
-      const regular = cardsWithMetadata.filter((c) => !c.isPinned);
+      const pinned = filteredCards.filter((c) => c.isPinned);
+      const regular = filteredCards.filter((c) => !c.isPinned);
 
       const sortedPinned = pinned.sort((a, b) => {
         const priorityA = priorities.get(a.id);
@@ -195,7 +211,13 @@ export class KanbanService {
         emailIds,
       );
 
-      sortedCards = cardsWithMetadata.sort((a, b) => {
+      sortedCards = filteredCards.sort((a, b) => {
+        if (query?.sortBy === 'oldest') {
+          return new Date(a.date).getTime() - new Date(b.date).getTime();
+        } else if (query?.sortBy === 'newest') {
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        }
+
         const orderA = customOrders.get(a.id);
         const orderB = customOrders.get(b.id);
 

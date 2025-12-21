@@ -237,10 +237,15 @@ export class KanbanService {
       hasMore: !!response.nextPageToken,
     };
 
+    const labelIds = await this.gmailService.convertLabelNamesToIds(
+      userId,
+      config.labelIds,
+    );
+
     return {
       id: config.id,
       name: config.name,
-      labelIds: config.labelIds,
+      labelIds: labelIds,
       count: sortedCards.length,
       emails: sortedCards,
       color: config.color,

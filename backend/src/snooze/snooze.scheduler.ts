@@ -16,10 +16,10 @@ export class SnoozeScheduler {
       const restoredCount = await this.snoozeService.restoreDueSnoozes();
 
       if (restoredCount > 0) {
-        this.logger.log(`✅ Restored ${restoredCount} snoozed email(s)`);
+        this.logger.log(`Restored ${restoredCount} snoozed email(s)`);
       }
     } catch (error) {
-      this.logger.error(`❌ Error in snooze scheduler: ${error.message}`);
+      this.logger.error(`Error in snooze scheduler: ${error.message}`);
     }
   }
 }

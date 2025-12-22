@@ -7,6 +7,7 @@ import { SnoozeScheduler } from 'src/snooze/snooze.scheduler';
 import { EmailKanbanOrder } from 'src/email/entities/email-kanban-order.entity';
 import { SnoozeController } from './snooze.controller';
 import { KanbanColumnConfig } from 'src/kanban/entities/kanban-column-config.entity';
+import { User } from 'src/user/entities/user.entity';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { KanbanColumnConfig } from 'src/kanban/entities/kanban-column-config.ent
       EmailSnooze,
       EmailKanbanOrder,
       KanbanColumnConfig,
+      User,
     ]),
   ],
   providers: [SnoozeService, SnoozeScheduler],

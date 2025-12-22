@@ -1,14 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsNumber, Min } from 'class-validator';
-import { KanbanColumnId } from 'src/kanban/dto/kanban-column.dto';
+import { IsOptional, IsNumber, Min } from 'class-validator';
 
 export class PinEmailDto {
   @ApiProperty({
     description: 'Column ID (currently only supports inbox)',
-    example: 'inbox',
+    example: 1,
   })
-  @IsString()
-  columnId: KanbanColumnId;
+  @IsNumber()
+  columnId: number;
 
   @ApiPropertyOptional({
     description: 'Position within pinned section (0 = top)',

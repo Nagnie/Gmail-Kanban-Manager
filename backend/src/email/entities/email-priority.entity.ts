@@ -8,33 +8,47 @@ import {
 } from 'typeorm';
 
 @Entity('email_priorities')
-@Index(['userId', 'emailId'], { unique: true })
+@Index(['userId', 'emailId'])
 @Index(['userId', 'columnId', 'isPinned'])
 export class EmailPriority {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  @Column({
+    name: 'user_id',
+    type: 'int',
+  })
   userId: number;
 
-  @Column()
+  @Column({
+    name: 'email_id',
+    type: 'varchar',
+    length: 255,
+  })
   emailId: string;
 
-  @Column()
-  columnId: string;
+  @Column({
+    name: 'column_id',
+    type: 'int',
+  })
+  columnId: number;
 
-  @Column({ default: false })
+  @Column({ default: false, name: 'is_pinned' })
   isPinned: boolean;
 
-  @Column({ type: 'float', nullable: true })
+  @Column({ type: 'float', nullable: true, name: 'pinned_order' })
   pinnedOrder: number;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: 'int', default: 0, name: 'priority_level' })
   priorityLevel: number; // 0 = normal, 1 = high, 2 = urgent
 
-  @CreateDateColumn()
+  @CreateDateColumn({
+    name: 'created_at',
+  })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({
+    name: 'updated_at',
+  })
   updatedAt: Date;
 }

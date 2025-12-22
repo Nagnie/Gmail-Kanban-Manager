@@ -49,9 +49,8 @@ export class SnoozeResponseDto {
 
   @ApiProperty({
     description: 'Original column',
-    example: 'inbox',
   })
-  originalColumn: string;
+  originalColumn: number;
 
   @ApiProperty({
     description: 'Snooze until time',

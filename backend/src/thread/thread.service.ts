@@ -14,7 +14,22 @@ export class ThreadService {
     userId: number,
     threadId: string,
   ): Promise<ThreadDetailDto> {
-    const thread = await this.gmailService.getThread(userId, threadId);
+    let thread: gmail_v1.Schema$Thread = {};
+
+    try {
+      thread = await this.gmailService.getThread(userId, threadId);
+    } catch {
+      // if thread not found, try to fetch messages individually
+      // console.log('🚀 ~ ThreadService ~ getThreadDetail ~ error:', error);
+      const message = await this.gmailService.getMessage(userId, threadId);
+      thread = {
+        id: message.threadId || threadId,
+        historyId: message.historyId,
+        snippet: message.snippet,
+        messages: [message],
+      };
+    }
+
     const messages = (thread.messages || []).map((message) =>
       parseEmailDetail(message),
     );

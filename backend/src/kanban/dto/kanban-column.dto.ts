@@ -2,21 +2,12 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EmailCardDto } from './email-card.dto';
 import { KanbanColumnPaginationDto } from './kanban-pagination.dto';
 
-export enum KanbanColumnId {
-  INBOX = 'inbox',
-  TODO = 'todo',
-  IN_PROGRESS = 'in_progress',
-  DONE = 'done',
-  SNOOZED = 'snoozed',
-}
-
 export class KanbanColumnDto {
   @ApiProperty({
     description: 'Column unique identifier',
-    enum: KanbanColumnId,
-    example: 'inbox',
+    example: 1,
   })
-  id: string;
+  id: number;
 
   @ApiProperty({
     description: 'Column display name',

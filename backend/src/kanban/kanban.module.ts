@@ -10,6 +10,7 @@ import { EmailSnooze } from '../email/entities/email-snooze.entity';
 import { SnoozeModule } from '../snooze/snooze.module';
 import { OpenRouterModule } from 'src/open-router/open-router.module';
 import { OpenRouterService } from 'src/open-router/open-router.service';
+import { KanbanColumnConfig } from 'src/kanban/entities/kanban-column-config.entity';
 
 @Module({
   imports: [
@@ -19,9 +20,10 @@ import { OpenRouterService } from 'src/open-router/open-router.service';
       EmailSummary,
       EmailKanbanOrder,
       EmailSnooze,
+      KanbanColumnConfig,
     ]),
     SnoozeModule,
-    OpenRouterModule
+    OpenRouterModule,
   ],
   controllers: [KanbanController],
   providers: [KanbanService, OpenRouterService],

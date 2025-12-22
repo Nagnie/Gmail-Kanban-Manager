@@ -1,19 +1,30 @@
 import { apiClient } from "@/services/core/api-client";
 
 import type { ApiResponse } from "@/services/core/types";
-import type {
-    GetColumnQueryDto,
-    KanbanColumnDto,
-    KanbanColumnId,
-    MoveEmailDto,
-    MoveEmailResponseDto,
-    ReorderEmailsDto,
-    ReorderEmailsResponseDto,
-    SnoozeEmailDto,
-    SnoozeResponseDto,
-    SummarizeEmailDto,
-    SummarizeResponseDto,
+import {
+    type KanbanColumnsMetaResponseDto,
+    type GetColumnQueryDto,
+    type KanbanColumnDto,
+    type KanbanColumnId,
+    type MoveEmailDto,
+    type MoveEmailResponseDto,
+    type ReorderEmailsDto,
+    type ReorderEmailsResponseDto,
+    type SnoozeEmailDto,
+    type SnoozeResponseDto,
+    type SummarizeEmailDto,
+    type SummarizeResponseDto,
 } from "@/services/kanban/types";
+
+export const getUserKanbanColumnsMeta = async () => {
+    const client = apiClient.getClient();
+
+    const response = await client.get<ApiResponse<KanbanColumnsMetaResponseDto>>(
+        `/api/v1/emails/kanban/columns`
+    );
+
+    return response.data.data;
+};
 
 // Api call lấy thông tin của một cột Kanban cụ thể
 // sẽ call 4 api cho 4 cột: "inbox" | "todo" | "in_progress" | "done"

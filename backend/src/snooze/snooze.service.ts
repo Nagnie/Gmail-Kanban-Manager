@@ -9,6 +9,7 @@ import { EmailKanbanOrder } from '../email/entities/email-kanban-order.entity';
 import { LessThanOrEqual, Repository } from 'typeorm';
 import { GmailService } from '../gmail/gmail.service';
 import { SnoozePreset } from '../kanban/dto/snooze-email.dto';
+import { KanbanColumnConfig } from 'src/kanban/entities/kanban-column-config.entity';
 
 @Injectable()
 export class SnoozeService {
@@ -18,6 +19,9 @@ export class SnoozeService {
 
     @InjectRepository(EmailKanbanOrder)
     private readonly orderRepository: Repository<EmailKanbanOrder>,
+
+    @InjectRepository(KanbanColumnConfig)
+    private readonly columnConfigRepository: Repository<KanbanColumnConfig>,
 
     private readonly gmailService: GmailService,
   ) {}
@@ -160,21 +164,14 @@ export class SnoozeService {
   }
 
   async restoreEmail(snooze: EmailSnooze): Promise<void> {
-    const columnLabelMap = {
-      inbox: ['INBOX'],
-      todo: ['Kanban/To Do'],
-      in_progress: ['Kanban/In Progress'],
-      done: ['Kanban/Done'],
-    };
+    const originalColumn = await this.columnConfigRepository.findOne({
+      where: {
+        userId: snooze.userId,
+        id: snooze.originalColumn,
+      },
+    });
 
-    const restoreLabels: string[] = columnLabelMap[snooze.originalColumn] || [
-      'INBOX',
-    ];
-
-    const restoreLabelIds = await this.gmailService.convertLabelNamesToIds(
-      snooze.userId,
-      restoreLabels,
-    );
+    const restoreLabels: string[] = [originalColumn?.gmailLabel || 'INBOX'];
 
     const removeLabelIds =
       (await this.gmailService.getLabelIdByName(
@@ -183,7 +180,7 @@ export class SnoozeService {
       )) || '';
 
     await this.gmailService.modifyMessage(snooze.userId, snooze.emailId, {
-      addLabelIds: restoreLabelIds,
+      addLabelIds: restoreLabels,
       removeLabelIds: [removeLabelIds],
     });
 

@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { KanbanColumnDto, KanbanColumnId } from './dto/kanban-column.dto';
+import { KanbanColumnDto } from './dto/kanban-column.dto';
 import { GetColumnQueryDto } from './dto/get-column.dto';
 import { GmailService } from '../gmail/gmail.service';
 import { EmailCardDto } from './dto/email-card.dto';
@@ -44,6 +44,7 @@ import {
   SummaryStatsDto,
 } from 'src/kanban/dto/summarize-email.dto';
 import { EmailSummaryDto } from 'src/mailbox/dto/email-summary.dto';
+import { KanbanColumnConfig } from 'src/kanban/entities/kanban-column-config.entity';
 
 @Injectable()
 export class KanbanService {
@@ -62,72 +63,136 @@ export class KanbanService {
     @InjectRepository(EmailSnooze)
     private readonly snoozeRepository: Repository<EmailSnooze>,
 
+    @InjectRepository(KanbanColumnConfig)
+    private readonly columnConfigRepository: Repository<KanbanColumnConfig>,
+
     private readonly snoozeService: SnoozeService,
 
     private readonly OpenRouterService: OpenRouterService,
   ) {}
 
-  getColumnsMetadata() {
-    const columns = {
-      [KanbanColumnId.INBOX]: {
-        id: KanbanColumnId.INBOX,
+  async createDefaultColumns(userId: number): Promise<KanbanColumnConfig[]> {
+    const defaultColumns = [
+      {
         name: 'Inbox',
-        labelIds: ['INBOX'],
-        count: 0,
-        color: '#1976d2',
+        gmailLabel: 'INBOX',
+        gmailLabelName: 'Inbox',
         order: 0,
       },
-      [KanbanColumnId.TODO]: {
-        id: KanbanColumnId.TODO,
+      {
         name: 'To Do',
-        labelIds: ['Kanban/To Do'],
-        count: 0,
-        color: '#f57c00',
+        gmailLabel:
+          (await this.gmailService.getLabelIdByName(userId, 'Kanban/To Do')) ??
+          '',
+        gmailLabelName: 'Kanban/To Do',
         order: 1,
       },
-      [KanbanColumnId.IN_PROGRESS]: {
-        id: KanbanColumnId.IN_PROGRESS,
+      {
         name: 'In Progress',
-        labelIds: ['Kanban/In Progress'],
-        count: 0,
-        color: '#fbc02d',
+        gmailLabel:
+          (await this.gmailService.getLabelIdByName(
+            userId,
+            'Kanban/In Progress',
+          )) ?? '',
+        gmailLabelName: 'Kanban/In Progress',
         order: 2,
       },
-      [KanbanColumnId.DONE]: {
-        id: KanbanColumnId.DONE,
+      {
         name: 'Done',
-        labelIds: ['Kanban/Done'],
-        count: 0,
-        color: '#388e3c',
+        gmailLabel:
+          (await this.gmailService.getLabelIdByName(userId, 'Kanban/Done')) ??
+          '',
+        gmailLabelName: 'Kanban/Done',
         order: 3,
       },
-      [KanbanColumnId.SNOOZED]: {
-        id: KanbanColumnId.SNOOZED,
+      {
         name: 'Snoozed',
-        labelIds: ['Kanban/Snoozed'],
-        count: 0,
-        color: '#7b1fa2',
+        gmailLabel:
+          (await this.gmailService.getLabelIdByName(
+            userId,
+            'Kanban/Snoozed',
+          )) ?? '',
+        gmailLabelName: 'Kanban/Snoozed',
         order: 4,
       },
-    };
+    ];
 
-    return { columns };
+    const entities = defaultColumns.map((col) =>
+      this.columnConfigRepository.create({ ...col, userId }),
+    );
+
+    const savedColumns = await this.columnConfigRepository.save(entities);
+
+    return savedColumns;
+  }
+
+  async getUserColumns(userId: number): Promise<{
+    columns: {
+      [key: number]: {
+        id: number;
+        name: string;
+        labelIds: string[];
+        order: number;
+        count: number;
+      };
+    };
+  }> {
+    const userColumns = await this.columnConfigRepository.find({
+      where: { userId, isActive: true },
+      order: { order: 'ASC' },
+    });
+
+    if (userColumns.length === 0) {
+      const defaultColumns = await this.createDefaultColumns(userId);
+      return this.formatColumnsResponse(defaultColumns);
+    }
+
+    return this.formatColumnsResponse(userColumns);
+  }
+
+  private formatColumnsResponse(columns: KanbanColumnConfig[]): {
+    columns: {
+      [key: number]: {
+        id: number;
+        name: string;
+        labelIds: string[];
+        order: number;
+        count: number;
+      };
+    };
+  } {
+    const formattedColumns: Record<number, any> = {};
+
+    columns.forEach((col) => {
+      formattedColumns[col.id] = {
+        id: col.id,
+        name: col.name,
+        labelIds: [col.gmailLabel],
+        order: col.order,
+        count: 0,
+      };
+    });
+
+    return { columns: formattedColumns };
   }
 
   async getKanbanColumn(
     userId: number,
-    columnId: KanbanColumnId,
+    columnId: number,
     query: GetColumnQueryDto,
   ): Promise<KanbanColumnDto> {
-    const columnConfigMap = this.getColumnsMetadata().columns;
+    const columnConfig = await this.columnConfigRepository.findOne({
+      where: { id: columnId, userId, isActive: true },
+    });
 
-    const config = columnConfigMap[columnId];
-
-    if (!config) {
-      throw new BadRequestException(`Invalid column ID: ${columnId}`);
+    if (!columnConfig) {
+      throw new BadRequestException(`Column ${columnId} not found or inactive`);
     }
 
-    const gmailQuery = this.buildColumnQueryWithFilters(config.labelIds, query);
+    const gmailQuery = this.buildColumnQueryWithFilters(
+      [columnConfig.gmailLabelName],
+      query,
+    );
 
     const response = await this.gmailService.listMessages(
       userId,
@@ -188,7 +253,7 @@ export class KanbanService {
     let sortedCards: EmailCardDto[];
     let pinnedCount = 0;
 
-    if (columnId === KanbanColumnId.INBOX) {
+    if (columnConfig.gmailLabel === 'INBOX') {
       const pinned = filteredCards.filter((c) => c.isPinned);
       const regular = filteredCards.filter((c) => !c.isPinned);
 
@@ -238,15 +303,14 @@ export class KanbanService {
     };
 
     return {
-      id: config.id,
-      name: config.name,
-      labelIds: config.labelIds,
+      id: columnConfig.id,
+      name: columnConfig.name,
+      labelIds: [columnConfig.gmailLabel],
       count: sortedCards.length,
       emails: sortedCards,
-      color: config.color,
-      order: config.order,
+      order: columnConfig.order,
       pagination,
-      canReorder: columnId !== KanbanColumnId.INBOX,
+      canReorder: columnConfig.gmailLabel !== 'INBOX',
       pinnedCount,
     };
   }
@@ -262,56 +326,36 @@ export class KanbanService {
       );
     }
 
-    const columnConfigMap = this.getColumnsMetadata().columns;
-
-    const targetConfig = columnConfigMap[moveDto.targetColumn];
-    const targetLabels = targetConfig.labelIds;
-    const targetLabelIds = await this.gmailService.convertLabelNamesToIds(
-      userId,
-      targetLabels,
-    );
-
-    const sourceConfig = columnConfigMap[moveDto.sourceColumn];
-    const sourceLabels = sourceConfig.labelIds;
-    const sourceLabelIds = await this.gmailService.convertLabelNamesToIds(
-      userId,
-      sourceLabels,
-    );
-
-    if (!sourceLabels || !targetLabels) {
-      throw new BadRequestException('Invalid column ID');
-    }
-
-    const addLabelIds: string[] = [...targetLabelIds];
-    const removeLabelIds: string[] = [...sourceLabelIds];
-
-    switch (moveDto.targetColumn) {
-      case KanbanColumnId.DONE:
-        removeLabelIds.push('UNREAD', 'INBOX');
-        break;
-
-      case KanbanColumnId.INBOX:
-        addLabelIds.push('INBOX');
-        removeLabelIds.push(
-          'Kanban/To Do',
-          'Kanban/In Progress',
-          'Kanban/Done',
-          'Kanban/Snoozed',
-        );
-        break;
-
-      case KanbanColumnId.SNOOZED:
-        removeLabelIds.push('INBOX');
-        break;
-    }
-
-    const uniqueAddLabels = [...new Set(addLabelIds)];
-    const uniqueRemoveLabels = [...new Set(removeLabelIds)];
-
-    await this.gmailService.modifyMessage(userId, emailId, {
-      addLabelIds: uniqueAddLabels,
-      removeLabelIds: uniqueRemoveLabels,
+    const targetColumn = await this.columnConfigRepository.findOne({
+      where: { id: moveDto.targetColumn, userId },
     });
+
+    if (!targetColumn) {
+      throw new BadRequestException(
+        `Target column ${moveDto.targetColumn} not found`,
+      );
+    }
+
+    let sourceColumn: KanbanColumnConfig | null = null;
+    if (moveDto.sourceColumn) {
+      sourceColumn = await this.columnConfigRepository.findOne({
+        where: { id: moveDto.sourceColumn, userId },
+      });
+    }
+
+    // Update Gmail labels
+    const labelsToAdd = [targetColumn.gmailLabel];
+    const labelsToRemove = sourceColumn ? [sourceColumn.gmailLabel] : [];
+
+    try {
+      await this.gmailService.modifyMessage(userId, emailId, {
+        addLabelIds: labelsToAdd,
+        removeLabelIds: labelsToRemove,
+      });
+    } catch (error) {
+      console.error('Failed to update Gmail labels:', error);
+      throw new BadRequestException('Failed to move email in Gmail');
+    }
 
     await this.orderRepository.delete({
       userId,
@@ -335,6 +379,22 @@ export class KanbanService {
         emailId,
       );
     }
+
+    if (
+      targetColumn.gmailLabel === 'INBOX' ||
+      sourceColumn?.gmailLabel === 'INBOX'
+    ) {
+      const existingPriority = await this.priorityRepository.findOne({
+        where: { userId, emailId },
+      });
+
+      if (existingPriority) {
+        existingPriority.columnId = moveDto.targetColumn;
+        await this.priorityRepository.save(existingPriority);
+      }
+    }
+
+    console.log(`Email moved successfully to column ${moveDto.targetColumn}`);
 
     return {
       success: true,
@@ -380,7 +440,15 @@ export class KanbanService {
     userId: number,
     reorderDto: ReorderEmailsDto,
   ): Promise<ReorderEmailsResponseDto> {
-    if (reorderDto.columnId === KanbanColumnId.INBOX) {
+    const column = await this.columnConfigRepository.findOne({
+      where: { id: reorderDto.columnId, userId },
+    });
+
+    if (!column) {
+      throw new BadRequestException(`Column ${reorderDto.columnId} not found`);
+    }
+
+    if (column.gmailLabel === 'INBOX') {
       throw new BadRequestException(
         'Inbox emails cannot be reordered manually. ' +
           'They are automatically sorted by date (newest first). ' +
@@ -413,43 +481,68 @@ export class KanbanService {
     emailId: string,
     snoozeDto: SnoozeEmailDto,
   ): Promise<SnoozeResponseDto> {
+    // Detect current column from email labels
+    const currentColumn = await this.detectCurrentColumnFromEmail(
+      userId,
+      emailId,
+    );
+
+    if (!currentColumn) {
+      throw new BadRequestException('Could not determine current email column');
+    }
+
     const email = await this.gmailService.getMessage(userId, emailId);
 
     if (!email) {
       throw new NotFoundException('Email not found');
     }
 
-    const currentLabels = email.labelIds || [];
-    const originalColumn = await this.detectColumnFromLabels(
-      currentLabels,
-      userId,
-    );
+    // Find snoozed column
+    let snoozedColumn = await this.columnConfigRepository.findOne({
+      where: {
+        userId,
+        gmailLabelName: 'Kanban/Snoozed',
+      },
+    });
+
+    if (!snoozedColumn) {
+      // throw new BadRequestException('Snoozed column not found');
+      // create snoozed column if not found
+      const existingColumns = await this.columnConfigRepository.find({
+        where: { userId },
+      });
+      const newSnoozedColumn = this.columnConfigRepository.create({
+        name: 'Snoozed',
+        gmailLabel:
+          (await this.gmailService.getLabelIdByName(
+            userId,
+            'Kanban/Snoozed',
+          )) ?? '',
+        gmailLabelName: 'Kanban/Snoozed',
+        order: existingColumns.length + 1,
+        userId,
+        isActive: false,
+      });
+      await this.columnConfigRepository.save(newSnoozedColumn);
+      snoozedColumn = newSnoozedColumn;
+    }
 
     const snoozeUntil = this.snoozeService.calculateSnoozeTime(
       snoozeDto.preset,
       snoozeDto.customDate,
     );
 
-    const kanbanLabels = ['Kanban/To Do', 'Kanban/In Progress', 'Kanban/Done'];
-    const kanbanLabelIds = await this.gmailService.convertLabelNamesToIds(
-      userId,
-      kanbanLabels,
-    );
-
-    const addLabelIds =
-      (await this.gmailService.getLabelIdByName(userId, 'Kanban/Snoozed')) ||
-      '';
-
-    await this.gmailService.modifyMessage(userId, emailId, {
-      addLabelIds: [addLabelIds],
-      removeLabelIds: ['INBOX', ...kanbanLabelIds],
+    // Move email to snoozed column
+    await this.moveEmailToColumn(userId, emailId, {
+      sourceColumn: currentColumn.id,
+      targetColumn: snoozedColumn.id,
     });
 
     const snooze = this.snoozeRepository.create({
       userId,
       emailId,
       threadId: email.threadId,
-      originalColumn,
+      originalColumn: currentColumn.id,
       snoozeUntil,
       isRestored: false,
     } as EmailSnooze);
@@ -538,7 +631,15 @@ export class KanbanService {
     emailId: string,
     pinDto: PinEmailDto,
   ): Promise<PinResponseDto> {
-    if (pinDto.columnId !== KanbanColumnId.INBOX) {
+    const column = await this.columnConfigRepository.findOne({
+      where: { id: pinDto.columnId, userId },
+    });
+
+    if (!column) {
+      throw new BadRequestException(`Column ${pinDto.columnId} not found`);
+    }
+
+    if (column.gmailLabel !== 'INBOX') {
       throw new BadRequestException(
         'Pin feature currently only available for Inbox column',
       );
@@ -647,7 +748,7 @@ export class KanbanService {
       priority = await this.priorityRepository.save({
         userId,
         emailId,
-        columnId,
+        columnId: columnId?.id,
         isPinned: false,
         priorityLevel: priorityDto.priorityLevel,
       });
@@ -879,7 +980,7 @@ export class KanbanService {
 
   private async getCustomOrders(
     userId: number,
-    columnId: string,
+    columnId: number,
     emailIds: string[],
   ): Promise<Map<string, number>> {
     if (emailIds.length === 0) {
@@ -900,7 +1001,7 @@ export class KanbanService {
 
   private async shiftEmailPositions(
     userId: number,
-    columnId: string,
+    columnId: number,
     insertPosition: number,
     excludeEmailId: string,
   ): Promise<void> {
@@ -929,32 +1030,36 @@ export class KanbanService {
     }
   }
 
-  private async detectColumnFromLabels(labelIds: string[], userId: number) {
-    const [
-      kanbanToDoLabelId,
-      kanbanInProgressLabelId,
-      kanbanDoneLabelId,
-      kanbanSnoozedLabelId,
-    ] = await Promise.all([
-      this.gmailService.getLabelIdByName(userId, 'Kanban/To Do'),
-      this.gmailService.getLabelIdByName(userId, 'Kanban/In Progress'),
-      this.gmailService.getLabelIdByName(userId, 'Kanban/Done'),
-      this.gmailService.getLabelIdByName(userId, 'Kanban/Snoozed'),
-    ]);
+  private async detectColumnFromLabels(
+    labelIds: string[],
+    userId: number,
+  ): Promise<KanbanColumnConfig | null> {
+    // Find column config that matches any of the email's labels
+    const matchingColumn = await this.columnConfigRepository.findOne({
+      where: {
+        userId,
+        gmailLabel: In(labelIds),
+      },
+    });
 
-    if (labelIds.includes(kanbanToDoLabelId || 'Kanban/To Do')) return 'todo';
-    if (labelIds.includes(kanbanInProgressLabelId || 'Kanban/In Progress'))
-      return 'in_progress';
-    if (labelIds.includes(kanbanDoneLabelId || 'Kanban/Done')) return 'done';
-    if (labelIds.includes(kanbanSnoozedLabelId || 'Kanban/Snoozed'))
-      return 'snoozed';
+    return matchingColumn;
+  }
 
-    return 'inbox';
+  private async detectCurrentColumnFromEmail(
+    userId: number,
+    emailId: string,
+  ): Promise<KanbanColumnConfig | null> {
+    // Get email details from Gmail
+    const message = await this.gmailService.getMessage(userId, emailId);
+    const labelIds = message.labelIds || [];
+
+    // Find matching column
+    return this.detectColumnFromLabels(labelIds, userId);
   }
 
   private async shiftPinnedPositions(
     userId: number,
-    columnId: string,
+    columnId: number,
     insertPosition: number,
     excludeEmailId: string,
   ): Promise<void> {

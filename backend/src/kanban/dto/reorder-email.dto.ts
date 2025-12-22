@@ -1,7 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNumber, IsArray, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
-import { KanbanColumnId } from './kanban-column.dto';
 
 export class EmailOrderDto {
   @ApiProperty({
@@ -22,10 +21,10 @@ export class EmailOrderDto {
 export class ReorderEmailsDto {
   @ApiProperty({
     description: 'Column ID',
-    example: 'todo',
+    example: 1,
   })
-  @IsString()
-  columnId: KanbanColumnId;
+  @IsNumber()
+  columnId: number;
 
   @ApiProperty({
     description: 'Array of emails with new positions',

@@ -1,23 +1,20 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsNumber } from 'class-validator';
-import { KanbanColumnId } from './kanban-column.dto';
+import { IsOptional, IsNumber } from 'class-validator';
 
 export class MoveEmailDto {
   @ApiProperty({
     description: 'Source column ID',
-    enum: KanbanColumnId,
-    example: 'inbox',
+    example: 1,
   })
-  @IsEnum(KanbanColumnId)
-  sourceColumn: KanbanColumnId;
+  @IsNumber()
+  sourceColumn: number;
 
   @ApiProperty({
     description: 'Target column ID',
-    enum: KanbanColumnId,
-    example: 'todo',
+    example: 2,
   })
-  @IsEnum(KanbanColumnId)
-  targetColumn: KanbanColumnId;
+  @IsNumber()
+  targetColumn: number;
 
   @ApiProperty({
     description: 'New position in target column',
@@ -44,15 +41,15 @@ export class MoveEmailResponseDto {
 
   @ApiProperty({
     description: 'Source column ID',
-    example: 'inbox',
+    example: 1,
   })
-  sourceColumn: string;
+  sourceColumn: number;
 
   @ApiProperty({
     description: 'Target column ID',
-    example: 'todo',
+    example: 2,
   })
-  targetColumn: string;
+  targetColumn: number;
 
   @ApiProperty({
     description: 'Message providing additional info about the move operation',

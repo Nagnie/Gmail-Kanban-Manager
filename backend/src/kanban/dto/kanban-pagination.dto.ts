@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, Min, Max, IsOptional, IsString, IsEnum } from 'class-validator';
+import {
+  IsInt,
+  Min,
+  Max,
+  IsOptional,
+  IsString,
+  IsEnum,
+  IsNumber,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 
 export enum SortOrder {
@@ -26,8 +34,8 @@ export class KanbanQueryDto {
     example: 'inbox',
   })
   @IsOptional()
-  @IsString()
-  columnId?: string;
+  @IsNumber()
+  columnId?: number;
 
   @ApiPropertyOptional({
     description: 'Page token for next page',

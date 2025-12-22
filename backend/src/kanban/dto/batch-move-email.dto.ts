@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsEnum } from 'class-validator';
-import { KanbanColumnId } from './kanban-column.dto';
+import { IsArray, IsNumber } from 'class-validator';
 
 export class BatchMoveEmailDto {
   @ApiProperty({
@@ -13,19 +12,17 @@ export class BatchMoveEmailDto {
 
   @ApiProperty({
     description: 'Source column',
-    enum: KanbanColumnId,
-    example: 'inbox',
+    example: 1,
   })
-  @IsEnum(KanbanColumnId)
-  sourceColumn: KanbanColumnId;
+  @IsNumber()
+  sourceColumn: number;
 
   @ApiProperty({
     description: 'Target column',
-    enum: KanbanColumnId,
-    example: 'done',
+    example: 2,
   })
-  @IsEnum(KanbanColumnId)
-  targetColumn: KanbanColumnId;
+  @IsNumber()
+  targetColumn: number;
 }
 
 export class BatchMoveEmailResponseDto {

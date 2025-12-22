@@ -9,6 +9,7 @@ import {
     Eye,
     EyeOff,
     Inbox,
+    ListTodo,
     Loader2,
     Mail,
     MailOpen,
@@ -18,7 +19,7 @@ import {
     SlidersHorizontal,
     X,
 } from "lucide-react";
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,7 @@ import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import {
     kanbanKeys,
     useKanbanColumn,
+    useKanbanColumnsMeta,
     useMoveEmail,
     useSnoozedEmails,
     useSnoozeEmail,
@@ -35,7 +37,6 @@ import {
 } from "@/hooks/useKanbanQueries";
 import { useMailboxEmails } from "@/hooks/useMailboxEmails";
 import { DraggableEmailCard } from "@/pages/KanbanBoard/components/DraggableEmailCard";
-import { DroppableColumn } from "@/pages/KanbanBoard/components/DroppableColumn";
 import { StaticEmailCard } from "@/pages/KanbanBoard/components/StaticEmailCard";
 import {
     closestCorners,
@@ -50,7 +51,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { EmailCardDto, KanbanColumnId, SnoozeResponseDto } from "@/services/kanban/types";
 import { FuzzySearchBar } from "@/components/FuzzySearchBar";
 import { useNavigate } from "react-router-dom";
-import { ColumnFilterMenu } from "@/components/ColumnFilterMenu";
+import KanbanColumn from "@/components/KanbanColumn";
 
 export type ColumnSettings = {
     sortBy: "date-desc" | "date-asc" | "sender";
@@ -59,31 +60,59 @@ export type ColumnSettings = {
     search: string;
 };
 
+const applyFiltersAndSort = (emails: EmailCardDto[], settings: ColumnSettings) => {
+    let filtered = [...emails];
+
+    if (settings.filterUnread) {
+        filtered = filtered.filter((email) => email.isUnread);
+    }
+    if (settings.filterAttachments) {
+        filtered = filtered.filter((email) => email.hasAttachments);
+    }
+
+    if (settings.search.trim()) {
+        const q = settings.search.toLowerCase();
+        filtered = filtered.filter((email) => {
+            const text = `${email.subject} ${email.fromName || ""} ${email.from || ""} ${
+                email.snippet || ""
+            }`.toLowerCase();
+            return text.includes(q);
+        });
+    }
+
+    filtered.sort((a, b) => {
+        switch (settings.sortBy) {
+            case "date-desc":
+                return new Date(b.date).getTime() - new Date(a.date).getTime();
+            case "date-asc":
+                return new Date(a.date).getTime() - new Date(b.date).getTime();
+            case "sender":
+                return (a.fromName || a.from || "").localeCompare(b.fromName || b.from || "");
+            default:
+                return 0;
+        }
+    });
+
+    return filtered;
+};
+
+const getColumnIcon = (columnName: string) => {
+    const name = columnName.toLowerCase();
+    if (name.includes("inbox")) return <Inbox className="w-4 h-4" />;
+    if (name.includes("todo") || name.includes("to do")) return <CheckCircle className="w-4 h-4" />;
+    if (name.includes("progress")) return <Clock className="w-4 h-4" />;
+    if (name.includes("done")) return <Archive className="w-4 h-4" />;
+    if (name.includes("snoozed")) return <Eye className="w-4 h-4" />;
+    return <ListTodo className="w-4 h-4" />;
+};
+
 const KanbanBoard = () => {
     const navigate = useNavigate();
-
     const queryClient = useQueryClient();
 
-    const baseColumns = React.useRef({
-        TODO: {
-            id: "TODO",
-            title: "To Do",
-            icon: <CheckCircle className="w-4 h-4" />,
-            emails: [] as EmailCardDto[],
-        },
-        IN_PROGRESS: {
-            id: "IN_PROGRESS",
-            title: "In Progress",
-            icon: <Clock className="w-4 h-4" />,
-            emails: [] as EmailCardDto[],
-        },
-        DONE: {
-            id: "DONE",
-            title: "Done",
-            icon: <Archive className="w-4 h-4" />,
-            emails: [] as EmailCardDto[],
-        },
-    });
+    // Fetch columns configuration
+    const { data: columnsConfig, isLoading: isLoadingColumns } = useKanbanColumnsMeta();
+
     const { mutate: moveEmail } = useMoveEmail();
     const { mutate: snoozeEmailMutation } = useSnoozeEmail();
     const { data: snoozedData } = useSnoozedEmails();
@@ -91,53 +120,15 @@ const KanbanBoard = () => {
     const { mutate: summarizeEmail } = useSummarizeEmail();
     const [summarizingId, setSummarizingId] = useState<string | null>(null);
 
-    const [columns, setColumns] = useState(() => ({
-        TODO: { ...baseColumns.current.TODO },
-        IN_PROGRESS: { ...baseColumns.current.IN_PROGRESS },
-        DONE: { ...baseColumns.current.DONE },
-    }));
+    const [inboxColumn, setInboxColumn] = useState<any>(null);
+    const [kanbanColumns, setKanbanColumns] = useState<any[]>([]);
 
-    const [columnSettings, setColumnSettings] = useState<Record<string, ColumnSettings>>({
-        inbox: { sortBy: "date-desc", filterUnread: false, filterAttachments: false, search: "" },
-        TODO: { sortBy: "date-desc", filterUnread: false, filterAttachments: false, search: "" },
-        IN_PROGRESS: {
-            sortBy: "date-desc",
-            filterUnread: false,
-            filterAttachments: false,
-            search: "",
-        },
-        DONE: { sortBy: "date-desc", filterUnread: false, filterAttachments: false, search: "" },
-    });
-
-    const [columnSearchVisible, setColumnSearchVisible] = useState<Record<string, boolean>>({
-        inbox: false,
-        TODO: false,
-        IN_PROGRESS: false,
-        DONE: false,
-    });
-
-    const updateColumnSettings = (
-        columnId: string,
-        updater: (prev: ColumnSettings) => ColumnSettings
-    ) => {
-        setColumnSettings((prev) => ({
-            ...prev,
-            [columnId]: updater(prev[columnId]),
-        }));
-    };
-
-    const toggleColumnSearch = (columnId: string) => {
-        setColumnSearchVisible((prev) => ({
-            ...prev,
-            [columnId]: !prev[columnId],
-        }));
-    };
+    const [columnSettings, setColumnSettings] = useState<Record<string, ColumnSettings>>({});
+    const [columnSearchVisible, setColumnSearchVisible] = useState<Record<string, boolean>>({});
 
     const [hiddenEmails, setHiddenEmails] = useState<SnoozeResponseDto[]>([]);
     const [activeEmail, setActiveEmail] = useState<EmailCardDto | null>(null);
     const [searchQuery] = useState("");
-    // const [fuzzySearchQuery, setFuzzySearchQuery] = useState("");
-    // const [isSearching, setIsSearching] = useState(false);
     const [isSearching] = useState(false);
     const [searchResults, setSearchResults] = useState<EmailCardDto[]>([]);
     const [showSearchResults, setShowSearchResults] = useState(false);
@@ -147,19 +138,7 @@ const KanbanBoard = () => {
     const [showFilterPanel, setShowFilterPanel] = useState(false);
     const [processedEmailIds, setProcessedEmailIds] = useState<Set<string>>(new Set());
 
-    // Filter & Sort states
-    // const [sortBy, setSortBy] = useState<"date-desc" | "date-asc" | "sender">("date-desc");
-    // const [filterUnread, setFilterUnread] = useState(false);
-    // const [filterAttachments, setFilterAttachments] = useState(false);
-    const [filterUnread] = useState(false);
-    const [filterAttachments] = useState(false);
-
-    const { data: todoData, isLoading: isLoadingTodo } = useKanbanColumn("todo");
-    const { data: inProgressData, isLoading: isLoadingInProgress } = useKanbanColumn("in_progress");
-    const { data: doneData, isLoading: isLoadingDone } = useKanbanColumn("done");
-    const { data: inboxData, isLoading: isLoadingInbox } = useKanbanColumn("inbox", {
-        search: searchQuery,
-    });
+    const { data: inboxData, isLoading: isLoadingInbox } = useKanbanColumn(inboxColumn?.id);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -185,32 +164,48 @@ const KanbanBoard = () => {
         onLoadMore: loadNextPage,
     });
 
+    // Initialize columns from API
     useEffect(() => {
-        if (todoData || inProgressData || doneData) {
-            setColumns({
-                TODO: {
-                    ...baseColumns.current.TODO,
-                    emails: todoData?.emails || [],
-                },
-                IN_PROGRESS: {
-                    ...baseColumns.current.IN_PROGRESS,
-                    emails: inProgressData?.emails || [],
-                },
-                DONE: {
-                    ...baseColumns.current.DONE,
-                    emails: doneData?.emails || [],
-                },
-            });
-        }
-    }, [todoData, inProgressData, doneData]);
+        if (columnsConfig?.columns) {
+            const cols = Object.values(columnsConfig.columns);
+            const sortedCols = cols.sort((a: any, b: any) => a.order - b.order);
 
+            const inbox = sortedCols.find(
+                (col: any) => col.labelIds?.includes("INBOX") || col.name.toLowerCase() === "inbox"
+            );
+            const kanban = sortedCols.filter(
+                (col: any) => !col.labelIds?.includes("INBOX") && col.name.toLowerCase() !== "inbox"
+            );
+
+            setInboxColumn(inbox);
+            setKanbanColumns(kanban);
+
+            // Initialize settings
+            const settings: Record<string, ColumnSettings> = {};
+            const searchVisible: Record<string, boolean> = {};
+
+            sortedCols.forEach((col: any) => {
+                const key = col.id.toString();
+                settings[key] = {
+                    sortBy: "date-desc",
+                    filterUnread: false,
+                    filterAttachments: false,
+                    search: "",
+                };
+                searchVisible[key] = false;
+            });
+
+            setColumnSettings(settings);
+            setColumnSearchVisible(searchVisible);
+        }
+    }, [columnsConfig]);
+
+    // Track processed emails from all kanban columns
     useEffect(() => {
-        const processed = new Set<string>();
-        [todoData, inProgressData, doneData].forEach((columnData) => {
-            columnData?.emails?.forEach((email) => processed.add(email.id));
-        });
-        setProcessedEmailIds(processed);
-    }, [todoData, inProgressData, doneData]);
+        // Note: We can't directly access column data here anymore
+        // since it's fetched in child components. We'll update this
+        // when emails are moved.
+    }, []);
 
     useEffect(() => {
         if (snoozedData) {
@@ -240,119 +235,40 @@ const KanbanBoard = () => {
         (email: EmailCardDto) => !processedEmailIds.has(email.id)
     );
 
-    // Apply filters and sorting
-    // const applyFiltersAndSort = (emails: EmailCardDto[]) => {
-    //     let filtered = [...emails];
-
-    //     // Apply filters
-    //     if (filterUnread) {
-    //         filtered = filtered.filter((email) => email.isUnread);
-    //     }
-    //     if (filterAttachments) {
-    //         filtered = filtered.filter((email) => email.hasAttachments);
-    //     }
-
-    //     // Apply sorting
-    //     filtered.sort((a, b) => {
-    //         switch (sortBy) {
-    //             case "date-desc":
-    //                 return new Date(b.date).getTime() - new Date(a.date).getTime();
-    //             case "date-asc":
-    //                 return new Date(a.date).getTime() - new Date(b.date).getTime();
-    //             case "sender":
-    //                 return (a.fromName || a.from || "").localeCompare(b.fromName || b.from || "");
-    //             default:
-    //                 return 0;
-    //         }
-    //     });
-
-    //     return filtered;
-    // };
-    const applyFiltersAndSort = (emails: EmailCardDto[], columnId: string) => {
-        const settings = columnSettings[columnId];
-
-        let filtered = [...emails];
-
-        // Filter: unread, attachments
-        if (settings.filterUnread) {
-            filtered = filtered.filter((email) => email.isUnread);
-        }
-        if (settings.filterAttachments) {
-            filtered = filtered.filter((email) => email.hasAttachments);
-        }
-
-        // Filter: search text trong subject/from/snippet
-        if (settings.search.trim()) {
-            const q = settings.search.toLowerCase();
-            filtered = filtered.filter((email) => {
-                const text = `${email.subject} ${email.fromName || ""} ${email.from || ""} ${
-                    email.snippet || ""
-                }`.toLowerCase();
-                return text.includes(q);
-            });
-        }
-
-        // Sort
-        filtered.sort((a, b) => {
-            switch (settings.sortBy) {
-                case "date-desc":
-                    return new Date(b.date).getTime() - new Date(a.date).getTime();
-                case "date-asc":
-                    return new Date(a.date).getTime() - new Date(b.date).getTime();
-                case "sender":
-                    return (a.fromName || a.from || "").localeCompare(b.fromName || b.from || "");
-                default:
-                    return 0;
-            }
-        });
-
-        return filtered;
+    const updateColumnSettings = (
+        columnId: string,
+        updater: (prev: ColumnSettings) => ColumnSettings
+    ) => {
+        setColumnSettings((prev) => ({
+            ...prev,
+            [columnId]: updater(
+                prev[columnId] || {
+                    sortBy: "date-desc",
+                    filterUnread: false,
+                    filterAttachments: false,
+                    search: "",
+                }
+            ),
+        }));
     };
 
-    // Filtered columns
-    // const filteredColumns = useMemo(
-    //     () => ({
-    //         TODO: {
-    //             ...columns.TODO,
-    //             emails: applyFiltersAndSort(columns.TODO.emails),
-    //         },
-    //         IN_PROGRESS: {
-    //             ...columns.IN_PROGRESS,
-    //             emails: applyFiltersAndSort(columns.IN_PROGRESS.emails),
-    //         },
-    //         DONE: {
-    //             ...columns.DONE,
-    //             emails: applyFiltersAndSort(columns.DONE.emails),
-    //         },
-    //     }),
-    //     [columns, sortBy, filterUnread, filterAttachments]
-    // );
+    const toggleColumnSearch = (columnId: string) => {
+        setColumnSearchVisible((prev) => ({
+            ...prev,
+            [columnId]: !prev[columnId],
+        }));
+    };
 
-    // const filteredInboxEmails = useMemo(
-    //     () => applyFiltersAndSort(inboxEmails),
-    //     [inboxEmails, sortBy, filterUnread, filterAttachments]
-    // );
-    const filteredColumns = useMemo(
-        () => ({
-            TODO: {
-                ...columns.TODO,
-                emails: applyFiltersAndSort(columns.TODO.emails, "TODO"),
-            },
-            IN_PROGRESS: {
-                ...columns.IN_PROGRESS,
-                emails: applyFiltersAndSort(columns.IN_PROGRESS.emails, "IN_PROGRESS"),
-            },
-            DONE: {
-                ...columns.DONE,
-                emails: applyFiltersAndSort(columns.DONE.emails, "DONE"),
-            },
-        }),
-        [columns, columnSettings]
-    );
+    const inboxSettings = columnSettings[inboxColumn?.id?.toString()] || {
+        sortBy: "date-desc",
+        filterUnread: false,
+        filterAttachments: false,
+        search: "",
+    };
 
     const filteredInboxEmails = useMemo(
-        () => applyFiltersAndSort(inboxEmails, "inbox"),
-        [inboxEmails, columnSettings]
+        () => applyFiltersAndSort(inboxEmails, inboxSettings),
+        [inboxEmails, inboxSettings]
     );
 
     const handleSummarizeEmail = (emailId: string) => {
@@ -377,42 +293,10 @@ const KanbanBoard = () => {
         );
     };
 
-    // Fuzzy search handler
-    // const handleFuzzySearch = (e: React.FormEvent) => {
-    //     e.preventDefault();
-    //     if (!fuzzySearchQuery.trim()) return;
-
-    //     setIsSearching(true);
-
-    //     // Simulate fuzzy search on all emails
-    //     setTimeout(() => {
-    //         const allEmails = [
-    //             ...filteredInboxEmails,
-    //             ...filteredColumns.TODO.emails,
-    //             ...filteredColumns.IN_PROGRESS.emails,
-    //             ...filteredColumns.DONE.emails,
-    //         ];
-
-    //         const query = fuzzySearchQuery.toLowerCase();
-    //         const results = allEmails.filter((email) => {
-    //             const searchText =
-    //                 `${email.subject} ${email.from} ${email.fromName} ${email.snippet}`.toLowerCase();
-    //             return searchText.includes(query);
-    //         });
-
-    //         setSearchResults(results);
-    //         setShowSearchResults(true);
-    //         setIsSearching(false);
-    //     }, 300);
-    // };
-
     const clearSearch = () => {
-        // setFuzzySearchQuery("");
         setSearchResults([]);
         setShowSearchResults(false);
     };
-
-    const isLoading = isLoadingTodo || isLoadingInProgress || isLoadingDone || isLoadingInbox;
 
     const handleDragStart = (event: any) => {
         const { active } = event;
@@ -436,42 +320,52 @@ const KanbanBoard = () => {
 
         if (source === targetColumnId) return;
 
-        const columnIdMap: Record<string, KanbanColumnId> = {
-            inbox: "inbox",
-            TODO: "todo",
-            IN_PROGRESS: "in_progress",
-            DONE: "done",
-        };
+        // Find columns
+        const sourceCol = kanbanColumns.find((c: any) => c.id.toString() === source);
+        const targetCol = kanbanColumns.find((c: any) => c.id.toString() === targetColumnId);
 
-        const sourceColumnApi = columnIdMap[source as string] || source;
-        const targetColumnApi = columnIdMap[targetColumnId] || targetColumnId;
+        const sourceColumnApi = sourceCol ? sourceCol.id : inboxColumn?.id;
+        const targetColumnApi = targetCol ? targetCol.id : targetColumnId;
 
-        const newColumns = {
-            TODO: { ...columns.TODO, emails: [...columns.TODO.emails] },
-            IN_PROGRESS: {
-                ...columns.IN_PROGRESS,
-                emails: [...columns.IN_PROGRESS.emails],
-            },
-            DONE: { ...columns.DONE, emails: [...columns.DONE.emails] },
-        };
-
-        if (source !== "inbox" && newColumns[source as keyof typeof newColumns]) {
-            newColumns[source as keyof typeof newColumns].emails = newColumns[
-                source as keyof typeof newColumns
-            ].emails.filter((e) => e.id !== email.id);
-        }
-
-        const targetArr = newColumns[targetColumnId as keyof typeof newColumns]?.emails;
-        if (targetArr) {
-            const alreadyInTarget = targetArr.some((e) => e.id === email.id);
-            if (!alreadyInTarget) {
-                targetArr.push(email);
-            }
-        }
-
-        setColumns(newColumns);
+        // Mark email as processed immediately
         setProcessedEmailIds((prev) => new Set(prev).add(email.id));
 
+        // Get query keys for source and target columns
+        const sourceQueryKey = kanbanKeys.column(sourceColumnApi);
+        const targetQueryKey = kanbanKeys.column(targetColumnApi);
+
+        // Cancel any outgoing refetches (so they don't overwrite our optimistic update)
+        queryClient.cancelQueries({ queryKey: sourceQueryKey });
+        queryClient.cancelQueries({ queryKey: targetQueryKey });
+
+        // Snapshot the previous values for rollback
+        const previousSourceData = queryClient.getQueryData(sourceQueryKey);
+        const previousTargetData = queryClient.getQueryData(targetQueryKey);
+
+        // Optimistically update source column (remove email)
+        queryClient.setQueryData(sourceQueryKey, (old: any) => {
+            if (!old) return old;
+            return {
+                ...old,
+                emails: old.emails.filter((e: EmailCardDto) => e.id !== email.id),
+            };
+        });
+
+        // Optimistically update target column (add email)
+        queryClient.setQueryData(targetQueryKey, (old: any) => {
+            if (!old) return old;
+
+            // Check if email already exists
+            const emailExists = old.emails.some((e: EmailCardDto) => e.id === email.id);
+            if (emailExists) return old;
+
+            return {
+                ...old,
+                emails: [...old.emails, email],
+            };
+        });
+
+        // Now call the API in background
         moveEmail(
             {
                 emailId: email.id,
@@ -483,7 +377,34 @@ const KanbanBoard = () => {
             {
                 onError: (error) => {
                     console.error("Failed to move email:", error);
-                    queryClient.invalidateQueries({ queryKey: kanbanKeys.columns() });
+
+                    queryClient.setQueryData(sourceQueryKey, previousSourceData);
+                    queryClient.setQueryData(targetQueryKey, previousTargetData);
+
+                    // Remove from processed set
+                    setProcessedEmailIds((prev) => {
+                        const newSet = new Set(prev);
+                        newSet.delete(email.id);
+                        return newSet;
+                    });
+
+                    // Optional: Show error toast/notification
+                    // toast.error("Failed to move email. Please try again.");
+                },
+                onSuccess: () => {
+                    // Success! The optimistic update was correct
+                    // We can optionally refresh to ensure consistency
+                    // but it's not necessary for UX
+
+                    // Optional: Silently refetch in background to ensure data consistency
+                    queryClient.invalidateQueries({
+                        queryKey: sourceQueryKey,
+                        refetchType: "none",
+                    });
+                    queryClient.invalidateQueries({
+                        queryKey: targetQueryKey,
+                        refetchType: "none",
+                    });
                 },
             }
         );
@@ -491,6 +412,7 @@ const KanbanBoard = () => {
 
     const handleHideEmail = (emailId: string) => {
         const email = filteredInboxEmails.find((e: EmailCardDto) => e.id === emailId);
+
         if (email) {
             setHiddenEmails((prev) => [...prev, email as any]);
             setProcessedEmailIds((prev) => new Set(prev).add(emailId));
@@ -499,7 +421,10 @@ const KanbanBoard = () => {
                 {
                     emailId,
                     snoozeDto: {
-                        preset: "tomorrow",
+                        // preset: "tomorrow",
+                        // test 1 minute later
+                        preset: "custom",
+                        customDate: new Date(Date.now() + 1 * 60 * 1000).toISOString(),
                     },
                 },
                 {
@@ -538,20 +463,15 @@ const KanbanBoard = () => {
     };
 
     const handleEmailSelect = (emailId: string) => {
-        // TODO: Open email detail modal or navigate
-        console.log("Selected email:", emailId);
         navigate(`/email/${emailId}?from=kanban`);
     };
 
     const handleViewAllSearch = (query: string) => {
-        // Navigate to full search page
-        // setFuzzySearchQuery(query);
         setShowSearchResults(true);
-
         navigate(`/search?q=${encodeURIComponent(query)}&from=kanban`);
     };
 
-    if (isLoadingEmails) {
+    if (isLoadingEmails || isLoadingColumns) {
         return (
             <div className="flex items-center justify-center h-[calc(100vh-64px)] bg-background">
                 <div className="text-center">
@@ -574,28 +494,6 @@ const KanbanBoard = () => {
                 <div className="bg-card border-b px-6 py-4">
                     <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3 flex-1">
-                            {/* Fuzzy Search Bar */}
-                            {/* <form onSubmit={handleFuzzySearch} className="relative flex-1 max-w-md">
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                <Input
-                                    type="text"
-                                    placeholder="Search all emails..."
-                                    value={fuzzySearchQuery}
-                                    onChange={(e) => setFuzzySearchQuery(e.target.value)}
-                                    className="pl-10 pr-10"
-                                />
-                                {fuzzySearchQuery && (
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="icon"
-                                        className="absolute right-1 top-1/2 transform -translate-y-1/2 h-7 w-7"
-                                        onClick={clearSearch}
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </Button>
-                                )}
-                            </form> */}
                             <FuzzySearchBar
                                 onEmailSelect={handleEmailSelect}
                                 onViewAll={handleViewAllSearch}
@@ -609,14 +507,14 @@ const KanbanBoard = () => {
                             >
                                 <SlidersHorizontal className="w-4 h-4 mr-2" />
                                 Filters
-                                {(columnSettings["inbox"]?.filterUnread ||
-                                    columnSettings["inbox"]?.filterAttachments) && (
+                                {(inboxSettings.filterUnread ||
+                                    inboxSettings.filterAttachments) && (
                                     <Badge
                                         variant="destructive"
                                         className="ml-2 h-5 w-5 p-0 text-xs"
                                     >
-                                        {(columnSettings["inbox"]?.filterUnread ? 1 : 0) +
-                                            (columnSettings["inbox"]?.filterAttachments ? 1 : 0)}
+                                        {(inboxSettings.filterUnread ? 1 : 0) +
+                                            (inboxSettings.filterAttachments ? 1 : 0)}
                                     </Badge>
                                 )}
                             </Button>
@@ -636,11 +534,8 @@ const KanbanBoard = () => {
                                 size="sm"
                                 onClick={handleRefresh}
                                 className="cursor-pointer"
-                                disabled={isLoading}
                             >
-                                <RefreshCw
-                                    className={`w-4 h-4 mr-2 ${isLoading ? "animate-spin" : ""}`}
-                                />
+                                <RefreshCw className="w-4 h-4 mr-2" />
                                 Refresh
                             </Button>
 
@@ -652,7 +547,7 @@ const KanbanBoard = () => {
                 </div>
 
                 {/* Filter Panel */}
-                {showFilterPanel && (
+                {showFilterPanel && inboxColumn && (
                     <div className="bg-card border-b px-6 py-3">
                         <div className="flex items-center gap-4">
                             <div className="flex items-center gap-2">
@@ -660,13 +555,11 @@ const KanbanBoard = () => {
                                 <span className="text-sm font-medium">Sort:</span>
                                 <Button
                                     variant={
-                                        columnSettings["inbox"]?.sortBy === "date-desc"
-                                            ? "secondary"
-                                            : "ghost"
+                                        inboxSettings.sortBy === "date-desc" ? "secondary" : "ghost"
                                     }
                                     size="sm"
                                     onClick={() => {
-                                        updateColumnSettings("inbox", (prev) => ({
+                                        updateColumnSettings(inboxColumn.id.toString(), (prev) => ({
                                             ...prev,
                                             sortBy: "date-desc",
                                         }));
@@ -677,13 +570,11 @@ const KanbanBoard = () => {
                                 </Button>
                                 <Button
                                     variant={
-                                        columnSettings["inbox"]?.sortBy === "date-asc"
-                                            ? "secondary"
-                                            : "ghost"
+                                        inboxSettings.sortBy === "date-asc" ? "secondary" : "ghost"
                                     }
                                     size="sm"
                                     onClick={() => {
-                                        updateColumnSettings("inbox", (prev) => ({
+                                        updateColumnSettings(inboxColumn.id.toString(), (prev) => ({
                                             ...prev,
                                             sortBy: "date-asc",
                                         }));
@@ -694,13 +585,11 @@ const KanbanBoard = () => {
                                 </Button>
                                 <Button
                                     variant={
-                                        columnSettings["inbox"]?.sortBy === "sender"
-                                            ? "secondary"
-                                            : "ghost"
+                                        inboxSettings.sortBy === "sender" ? "secondary" : "ghost"
                                     }
                                     size="sm"
                                     onClick={() => {
-                                        updateColumnSettings("inbox", (prev) => ({
+                                        updateColumnSettings(inboxColumn.id.toString(), (prev) => ({
                                             ...prev,
                                             sortBy: "sender",
                                         }));
@@ -716,14 +605,10 @@ const KanbanBoard = () => {
                             <div className="flex items-center gap-2">
                                 <span className="text-sm font-medium">Filter:</span>
                                 <Button
-                                    variant={
-                                        columnSettings["inbox"]?.filterUnread
-                                            ? "secondary"
-                                            : "ghost"
-                                    }
+                                    variant={inboxSettings.filterUnread ? "secondary" : "ghost"}
                                     size="sm"
                                     onClick={() => {
-                                        updateColumnSettings("inbox", (prev) => ({
+                                        updateColumnSettings(inboxColumn.id.toString(), (prev) => ({
                                             ...prev,
                                             filterUnread: !prev.filterUnread,
                                         }));
@@ -735,13 +620,11 @@ const KanbanBoard = () => {
                                 </Button>
                                 <Button
                                     variant={
-                                        columnSettings["inbox"]?.filterAttachments
-                                            ? "secondary"
-                                            : "ghost"
+                                        inboxSettings.filterAttachments ? "secondary" : "ghost"
                                     }
                                     size="sm"
                                     onClick={() => {
-                                        updateColumnSettings("inbox", (prev) => ({
+                                        updateColumnSettings(inboxColumn.id.toString(), (prev) => ({
                                             ...prev,
                                             filterAttachments: !prev.filterAttachments,
                                         }));
@@ -753,19 +636,16 @@ const KanbanBoard = () => {
                                 </Button>
                             </div>
 
-                            {(columnSettings["inbox"]?.filterUnread ||
-                                columnSettings["inbox"]?.filterAttachments ||
-                                columnSettings["inbox"]?.sortBy !== "date-desc") && (
+                            {(inboxSettings.filterUnread ||
+                                inboxSettings.filterAttachments ||
+                                inboxSettings.sortBy !== "date-desc") && (
                                 <>
                                     <div className="h-6 w-px bg-border" />
                                     <Button
                                         variant="ghost"
                                         size="sm"
                                         onClick={() => {
-                                            // setSortBy("date-desc");
-                                            // setFilterUnread(false);
-                                            // setFilterAttachments(false);
-                                            updateColumnSettings("inbox", () => ({
+                                            updateColumnSettings(inboxColumn.id.toString(), () => ({
                                                 sortBy: "date-desc",
                                                 filterUnread: false,
                                                 filterAttachments: false,
@@ -829,7 +709,8 @@ const KanbanBoard = () => {
                                         {searchResults.map((email) => (
                                             <div
                                                 key={email.id}
-                                                className="bg-card rounded-lg border p-4 hover:shadow-md transition-shadow"
+                                                className="bg-card rounded-lg border p-4 hover:shadow-md transition-shadow cursor-pointer"
+                                                onClick={() => handleEmailSelect(email.id)}
                                             >
                                                 <div className="flex items-start justify-between gap-4">
                                                     <div className="flex-1 min-w-0">
@@ -879,128 +760,145 @@ const KanbanBoard = () => {
                 {/* Main Content */}
                 <div className="flex-1 overflow-hidden flex">
                     {/* Inbox Panel */}
-                    <div
-                        className={`${
-                            showInboxPanel ? "w-100" : "w-0"
-                        } transition-all duration-300 border-r flex flex-col bg-sidebar`}
-                    >
-                        {showInboxPanel && (
-                            <>
-                                <div className="p-4 border-b bg-card flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <Inbox className="w-4 h-4" />
-                                        <h3 className="font-semibold">Inbox</h3>
-                                        <Badge variant="secondary">
-                                            {filteredInboxEmails.length}
-                                        </Badge>
-                                    </div>
+                    {inboxColumn && (
+                        <div
+                            className={`${
+                                showInboxPanel ? "w-100" : "w-0"
+                            } transition-all duration-300 border-r flex flex-col bg-sidebar`}
+                        >
+                            {showInboxPanel && (
+                                <>
+                                    <div className="p-4 border-b bg-card flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            {getColumnIcon(inboxColumn.name)}
+                                            <h3 className="font-semibold">{inboxColumn.name}</h3>
+                                            <Badge variant="secondary">
+                                                {filteredInboxEmails.length}
+                                            </Badge>
+                                        </div>
 
-                                    <div>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            className="h-8 w-8 cursor-pointer"
-                                            onClick={() => toggleColumnSearch("inbox")}
-                                        >
-                                            <Search
-                                                className={`w-4 h-4 ${
-                                                    columnSearchVisible["inbox"]
-                                                        ? "text-primary"
-                                                        : ""
-                                                }`}
-                                            />
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={() => setShowInboxPanel(false)}
-                                            className="cursor-pointer"
-                                        >
-                                            <ChevronLeft className="w-4 h-4" />
-                                        </Button>
-                                    </div>
-                                </div>
-
-                                {columnSearchVisible["inbox"] && (
-                                    <div className="px-4 mt-2">
-                                        <div className="animate-in slide-in-from-top-2 duration-200 pr-2">
-                                            <div className="relative">
-                                                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
-                                                <Input
-                                                    className="pl-7 pr-7 h-8 text-xs"
-                                                    placeholder="Search in this column..."
-                                                    value={columnSettings["inbox"].search}
-                                                    // Trong onChange của Input
-                                                    onChange={(e) => {
-                                                        const value = e.target.value;
-                                                        updateColumnSettings("inbox", (prev) => ({
-                                                            ...prev,
-                                                            search: value,
-                                                        }));
-                                                    }}
-                                                    autoFocus
+                                        <div>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                className="h-8 w-8 cursor-pointer"
+                                                onClick={() =>
+                                                    toggleColumnSearch(inboxColumn.id.toString())
+                                                }
+                                            >
+                                                <Search
+                                                    className={`w-4 h-4 ${
+                                                        columnSearchVisible[
+                                                            inboxColumn.id.toString()
+                                                        ]
+                                                            ? "text-primary"
+                                                            : ""
+                                                    }`}
                                                 />
-                                                {columnSettings["inbox"].search && (
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="absolute right-0 top-1/2 -translate-y-1/2 h-6 w-6"
-                                                        onClick={() =>
-                                                            updateColumnSettings(
-                                                                "inbox",
-                                                                (prev) => ({
-                                                                    ...prev,
-                                                                    search: "",
-                                                                })
-                                                            )
-                                                        }
-                                                    >
-                                                        <X className="w-3 h-3" />
-                                                    </Button>
-                                                )}
-                                            </div>
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => setShowInboxPanel(false)}
+                                                className="cursor-pointer"
+                                            >
+                                                <ChevronLeft className="w-4 h-4" />
+                                            </Button>
                                         </div>
                                     </div>
-                                )}
 
-                                <div className="flex-1 p-4 overflow-y-auto">
-                                    <div className="space-y-3">
-                                        {filteredInboxEmails.length === 0 ? (
-                                            <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                                                <Mail className="w-12 h-12 mb-2 opacity-50" />
-                                                <p className="text-sm text-center">
-                                                    {filterUnread || filterAttachments
-                                                        ? "No emails match filters"
-                                                        : "All emails organized!"}
-                                                </p>
-                                            </div>
-                                        ) : (
-                                            <>
-                                                {filteredInboxEmails.map((email: any) => (
-                                                    <DraggableEmailCard
-                                                        key={email.id}
-                                                        email={email}
-                                                        onHide={handleHideEmail}
-                                                        onSummarize={handleSummarizeEmail}
-                                                        isSummarizing={summarizingId === email.id}
-                                                        source="inbox"
+                                    {columnSearchVisible[inboxColumn.id.toString()] && (
+                                        <div className="px-4 mt-2">
+                                            <div className="animate-in slide-in-from-top-2 duration-200 pr-2">
+                                                <div className="relative">
+                                                    <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                                                    <Input
+                                                        className="pl-7 pr-7 h-8 text-xs"
+                                                        placeholder="Search in this column..."
+                                                        value={inboxSettings.search}
+                                                        onChange={(e) => {
+                                                            updateColumnSettings(
+                                                                inboxColumn.id.toString(),
+                                                                (prev) => ({
+                                                                    ...prev,
+                                                                    search: e.target.value,
+                                                                })
+                                                            );
+                                                        }}
+                                                        autoFocus
                                                     />
-                                                ))}
-                                                <div ref={sentinelRef} style={{ height: 32 }}></div>
-                                                {isFetchingEmails &&
-                                                    filteredInboxEmails.length > 0 && (
-                                                        <div className="w-full p-4 text-center">
-                                                            <Loader2 className="w-4 h-4 animate-spin mx-auto text-muted-foreground" />
-                                                        </div>
+                                                    {inboxSettings.search && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="absolute right-0 top-1/2 -translate-y-1/2 h-6 w-6"
+                                                            onClick={() =>
+                                                                updateColumnSettings(
+                                                                    inboxColumn.id.toString(),
+                                                                    (prev) => ({
+                                                                        ...prev,
+                                                                        search: "",
+                                                                    })
+                                                                )
+                                                            }
+                                                        >
+                                                            <X className="w-3 h-3" />
+                                                        </Button>
                                                     )}
-                                            </>
-                                        )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="flex-1 p-4 overflow-y-auto">
+                                        <div className="space-y-3">
+                                            {isLoadingInbox ? (
+                                                <div className="flex justify-center py-12">
+                                                    <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                                                </div>
+                                            ) : filteredInboxEmails.length === 0 ? (
+                                                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                                                    <Mail className="w-12 h-12 mb-2 opacity-50" />
+                                                    <p className="text-sm text-center">
+                                                        {inboxSettings.filterUnread ||
+                                                        inboxSettings.filterAttachments
+                                                            ? "No emails match filters"
+                                                            : "All emails organized!"}
+                                                    </p>
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    {filteredInboxEmails.map((email: any) => (
+                                                        <DraggableEmailCard
+                                                            key={email.id}
+                                                            email={email}
+                                                            onHide={handleHideEmail}
+                                                            onSummarize={handleSummarizeEmail}
+                                                            isSummarizing={
+                                                                summarizingId === email.id
+                                                            }
+                                                            source="inbox"
+                                                        />
+                                                    ))}
+                                                    <div
+                                                        ref={sentinelRef}
+                                                        style={{ height: 32 }}
+                                                    ></div>
+                                                    {isFetchingEmails &&
+                                                        filteredInboxEmails.length > 0 && (
+                                                            <div className="w-full p-4 text-center">
+                                                                <Loader2 className="w-4 h-4 animate-spin mx-auto text-muted-foreground" />
+                                                            </div>
+                                                        )}
+                                                </>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            </>
-                        )}
-                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
 
                     {/* Show Inbox Button when collapsed */}
                     {!showInboxPanel && (
@@ -1016,150 +914,31 @@ const KanbanBoard = () => {
                         </div>
                     )}
 
-                    {/* Kanban Board */}
+                    {/* Kanban Board - Dynamic Columns */}
                     <div className="flex-1 overflow-x-auto p-6">
                         <div className="flex gap-6 h-full min-w-max">
-                            {Object.values(filteredColumns).map((column) => (
-                                <div
+                            {kanbanColumns.map((column) => (
+                                <KanbanColumn
                                     key={column.id}
-                                    className="flex flex-col w-100 bg-sidebar rounded-lg"
-                                >
-                                    {/* Row 1: title + icons */}
-                                    <div className="flex items-center justify-between p-3">
-                                        <div className="flex items-center gap-2">
-                                            {column.icon}
-                                            <h3 className="font-semibold">{column.title}</h3>
-                                            <Badge variant="secondary">
-                                                {column.emails.length}
-                                            </Badge>
-
-                                            {/* Indicator khi có filter/sort/search active */}
-                                            {(columnSettings[column.id].filterUnread ||
-                                                columnSettings[column.id].filterAttachments ||
-                                                columnSettings[column.id].sortBy !==
-                                                    "date-desc") && (
-                                                <Badge
-                                                    variant="destructive"
-                                                    className="size-5 rounded-full text-[10px]"
-                                                >
-                                                    {
-                                                        [
-                                                            columnSettings[column.id].filterUnread,
-                                                            columnSettings[column.id]
-                                                                .filterAttachments,
-                                                            columnSettings[column.id].sortBy !==
-                                                                "date-desc",
-                                                        ].filter(Boolean).length
-                                                    }
-                                                </Badge>
-                                            )}
-                                        </div>
-
-                                        <div className="flex items-center gap-1">
-                                            {/* Toggle search button */}
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 cursor-pointer"
-                                                onClick={() => toggleColumnSearch(column.id)}
-                                            >
-                                                <Search
-                                                    className={`w-4 h-4 ${
-                                                        columnSearchVisible[column.id]
-                                                            ? "text-primary"
-                                                            : ""
-                                                    }`}
-                                                />
-                                            </Button>
-
-                                            {/* Filter/Sort dropdown */}
-                                            <ColumnFilterMenu
-                                                columnId={column.id}
-                                                settings={columnSettings[column.id]}
-                                                onChange={(next) =>
-                                                    updateColumnSettings(column.id, () => next)
-                                                }
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Row 2: search bar - chỉ hiện khi toggle = true */}
-                                    {columnSearchVisible[column.id] && (
-                                        <div className="px-3 pb-3 animate-in slide-in-from-top-2 duration-200">
-                                            <div className="relative">
-                                                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
-                                                <Input
-                                                    className="pl-7 pr-7 h-8 text-xs"
-                                                    placeholder="Search in this column..."
-                                                    value={columnSettings[column.id].search}
-                                                    // Trong onChange của Input
-                                                    onChange={(e) => {
-                                                        const value = e.target.value;
-                                                        updateColumnSettings(column.id, (prev) => ({
-                                                            ...prev,
-                                                            search: value,
-                                                        }));
-
-                                                        // Auto-close search nếu clear hết text (optional)
-                                                        // if (!value.trim()) {
-                                                        //     setTimeout(() => {
-                                                        //         setColumnSearchVisible((prev) => ({
-                                                        //             ...prev,
-                                                        //             [column.id]: false,
-                                                        //         }));
-                                                        //     }, 300); // delay nhẹ cho UX mượt
-                                                        // }
-                                                    }}
-                                                    autoFocus
-                                                />
-                                                {columnSettings[column.id].search && (
-                                                    <Button
-                                                        type="button"
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="absolute right-0 top-1/2 -translate-y-1/2 h-6 w-6"
-                                                        onClick={() =>
-                                                            updateColumnSettings(
-                                                                column.id,
-                                                                (prev) => ({
-                                                                    ...prev,
-                                                                    search: "",
-                                                                })
-                                                            )
-                                                        }
-                                                    >
-                                                        <X className="w-3 h-3" />
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <DroppableColumn id={column.id}>
-                                        <div className="space-y-3 min-h-[200px]">
-                                            {column.emails.length === 0 ? (
-                                                <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-                                                    <Mail className="w-12 h-12 mb-2 opacity-50" />
-                                                    <p className="text-sm">
-                                                        {filterUnread || filterAttachments
-                                                            ? "No emails match filters"
-                                                            : "Drop emails here"}
-                                                    </p>
-                                                </div>
-                                            ) : (
-                                                column.emails.map((email) => (
-                                                    <DraggableEmailCard
-                                                        key={email.id}
-                                                        email={email}
-                                                        source={column.id}
-                                                        onSummarize={handleSummarizeEmail}
-                                                        isSummarizing={summarizingId === email.id}
-                                                    />
-                                                ))
-                                            )}
-                                        </div>
-                                    </DroppableColumn>
-                                </div>
+                                    column={column}
+                                    settings={
+                                        columnSettings[column.id.toString()] || {
+                                            sortBy: "date-desc",
+                                            filterUnread: false,
+                                            filterAttachments: false,
+                                            search: "",
+                                        }
+                                    }
+                                    searchVisible={
+                                        columnSearchVisible[column.id.toString()] || false
+                                    }
+                                    summarizingId={summarizingId}
+                                    onUpdateSettings={(updater) =>
+                                        updateColumnSettings(column.id.toString(), updater)
+                                    }
+                                    onToggleSearch={() => toggleColumnSearch(column.id.toString())}
+                                    onSummarize={handleSummarizeEmail}
+                                />
                             ))}
                         </div>
                     </div>

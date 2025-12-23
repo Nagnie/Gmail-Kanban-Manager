@@ -300,7 +300,7 @@ export class KanbanService {
     const maxOrder = await this.columnConfigRepository
       .createQueryBuilder('column')
       .select('MAX(column.order)', 'maxOrder')
-      .where('column.user_id = :userId AND column.is_active = :isActive', {
+      .where('column.userId = :userId AND column.isActive = :isActive', {
         userId,
         isActive: true,
       })

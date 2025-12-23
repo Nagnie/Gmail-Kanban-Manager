@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -10,9 +11,12 @@ import { LessThanOrEqual, Repository } from 'typeorm';
 import { GmailService } from '../gmail/gmail.service';
 import { SnoozePreset } from '../kanban/dto/snooze-email.dto';
 import { KanbanColumnConfig } from 'src/kanban/entities/kanban-column-config.entity';
+import { SnoozeGateway } from 'src/snooze/snooze.gateway';
 
 @Injectable()
 export class SnoozeService {
+  private readonly logger = new Logger(SnoozeService.name);
+
   constructor(
     @InjectRepository(EmailSnooze)
     private readonly snoozeRepository: Repository<EmailSnooze>,
@@ -24,6 +28,8 @@ export class SnoozeService {
     private readonly columnConfigRepository: Repository<KanbanColumnConfig>,
 
     private readonly gmailService: GmailService,
+
+    private readonly snoozeGateway: SnoozeGateway,
   ) {}
 
   calculateSnoozeTime(preset: SnoozePreset, customDate?: string): Date {
@@ -217,6 +223,10 @@ export class SnoozeService {
       },
     });
 
+    if (dueSnoozes.length === 0) return 0;
+
+    this.logger.log(`Found ${dueSnoozes.length} snooze(s) to restore`);
+
     let restoredCount = 0;
 
     for (const snooze of dueSnoozes) {
@@ -226,6 +236,13 @@ export class SnoozeService {
         snooze.isRestored = true;
         snooze.restoredAt = new Date();
         await this.snoozeRepository.save(snooze);
+
+        // Notify user via WebSocket
+        this.snoozeGateway.notifyEmailRestored(
+          snooze.userId.toString(),
+          snooze.emailId,
+          snooze.originalColumn.toString(),
+        );
 
         restoredCount++;
       } catch (error) {

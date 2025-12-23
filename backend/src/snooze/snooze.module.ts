@@ -8,6 +8,8 @@ import { EmailKanbanOrder } from 'src/email/entities/email-kanban-order.entity';
 import { SnoozeController } from './snooze.controller';
 import { KanbanColumnConfig } from 'src/kanban/entities/kanban-column-config.entity';
 import { User } from 'src/user/entities/user.entity';
+import { SnoozeGateway } from 'src/snooze/snooze.gateway';
+import { WebSocketConnectionManager } from 'src/snooze/websocket-connection.manager';
 
 @Module({
   imports: [
@@ -19,8 +21,13 @@ import { User } from 'src/user/entities/user.entity';
       User,
     ]),
   ],
-  providers: [SnoozeService, SnoozeScheduler],
-  exports: [SnoozeService],
+  providers: [
+    SnoozeService,
+    SnoozeScheduler,
+    SnoozeGateway,
+    WebSocketConnectionManager,
+  ],
+  exports: [SnoozeService, SnoozeGateway, WebSocketConnectionManager],
   controllers: [SnoozeController],
 })
 export class SnoozeModule {}

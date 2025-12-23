@@ -20,6 +20,7 @@ import { CacheModule } from '@nestjs/cache-manager';
 import { SnoozeModule } from './snooze/snooze.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     OpenRouterModule,
     KanbanModule,
     SnoozeModule,
+    RedisModule,
   ],
   controllers: [AppController],
   providers: [AppService],

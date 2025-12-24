@@ -19,6 +19,7 @@ import {
   type ReorderColumnsDto,
   type KanbanColumnInfoDto,
   type SimpleSuccessResponseDto,
+  type AvailableLabelDto,
 } from "@/services/kanban/types";
 
 export const getUserKanbanColumnsMeta = async () => {
@@ -160,6 +161,17 @@ export const summarizeEmail = async (
 
   return response.data.data;
 };
+
+// Api call lấy danh sách nhãn có thể gán cho cột Kanban
+export const getAvailableLabels = async () => {
+  const client = apiClient.getClient();
+
+  const response = await client.get<ApiResponse<AvailableLabelDto[]>>(
+    `/api/v1/emails/kanban/labels/available`
+  );
+
+  return response.data.data;
+}
 
 // Create new column
 export const createKanbanColumn = async (dto: CreateColumnDto) => {

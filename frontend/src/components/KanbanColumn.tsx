@@ -18,6 +18,7 @@ import {
     Mail,
     Pencil,
     Search,
+    Tag,
     Trash2,
     X,
 } from "lucide-react";
@@ -40,6 +41,7 @@ interface KanbanColumnProps {
   onToggleSearch: () => void;
   onSummarize: (emailId: string) => void;
   onRenameColumn: (columnId: number, currentName: string) => void;
+  onAssignLabel: (columnId: number, currentName: string) => void;
   onDeleteColumn: (columnId: number) => void;
 }
 
@@ -98,6 +100,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
     onToggleSearch,
     onSummarize,
     onRenameColumn,
+    onAssignLabel,
     onDeleteColumn,
 }) => {
     // Each column fetches its own data
@@ -242,6 +245,13 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
                 >
                   <Pencil className='w-4 h-4 mr-2' />
                   Rename
+                </DropdownMenuItem>
+                 <DropdownMenuItem
+                  onClick={() => onAssignLabel(column.id, column.name)}
+                  className='cursor-pointer'
+                >
+                  <Tag className='w-4 h-4 mr-2' />
+                  Assign Label
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => onDeleteColumn(column.id)}

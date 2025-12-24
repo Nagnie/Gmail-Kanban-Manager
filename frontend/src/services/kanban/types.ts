@@ -203,6 +203,17 @@ export interface KanbanColumnInfoDto {
   updatedAt: string;
 }
 
+export type LabelType = "system" | "user" | "kanban";
+
+export interface AvailableLabelDto {
+  id: string;
+  name: string;
+  type: LabelType; 
+  isKanbanLabel: boolean;
+  isAssigned: boolean;
+  emailCount: number;
+}
+
 export type LabelOption = "none" | "existing" | "new";
 
 export interface CreateColumnDto {

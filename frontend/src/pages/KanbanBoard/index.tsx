@@ -52,6 +52,8 @@ import type {
 } from "@/services/kanban/types";
 import { useNavigate } from "react-router-dom";
 import KanbanColumn from "@/components/KanbanColumn";
+import { useAppSelector } from "@/hooks/redux";
+import { useSnoozeSocket } from "@/hooks/useSnoozeSocket";
 
 export type ColumnSettings = {
   sortBy: "date-desc" | "date-asc" | "sender";
@@ -116,6 +118,34 @@ const KanbanBoard = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+     const { user } = useAppSelector((state) => state.auth);
+
+    const { isConnected } = useSnoozeSocket({
+        userEmail: user?.email || "",
+        onEmailRestored: (event) => {
+            console.log("Email restored:", event);
+
+            setProcessedEmailIds((prev) => {
+                const next = new Set(prev);
+                next.delete(event.emailId);
+                return next;
+            });
+
+            // Refresh only the affected column
+            // refreshColumn(event.columnId);
+            queryClient.invalidateQueries({ queryKey: kanbanKeys.column(+event.columnId) });
+            queryClient.invalidateQueries({ queryKey: kanbanKeys.snoozed() });
+        },
+        onConnected: () => {
+            console.log("Snooze socket connected");
+        },
+        onDisconnected: () => {
+            console.log("Snooze socket disconnected, reconnecting...");
+        },
+        enabled: !!user?.email,
+    });
+    console.log("🚀 ~ KanbanBoard ~ isConnected:", isConnected);
+
   // Fetch columns configuration
   const { data: columnsConfig, isLoading: isLoadingColumns } =
     useKanbanColumnsMeta();
@@ -133,12 +163,25 @@ const KanbanBoard = () => {
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showRenameModal, setShowRenameModal] = useState(false);
+  const [showAssignLabelModal, setShowAssignLabelModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showReorderModal, setShowReorderModal] = useState(false);
 
+  const [errorMessage, setErrorMessage] = useState({
+    message: "",
+    target: "",
+  });
   const [newColumnName, setNewColumnName] = useState("");
+  const [newColumnLabelOption, setNewColumnLabelOption] = useState("none");
+  const [newColumnLabelId, setNewColumnLabelId] = useState<string | null>(null);
+  const [newColumnLabelName, setNewColumnLabelName] = useState<string>("");
   const [renameColumnId, setRenameColumnId] = useState<number | null>(null);
   const [renameColumnName, setRenameColumnName] = useState("");
+  const [assignLabelColumnId, setAssignLabelColumnId] = useState<number | null>(null);
+  const [assignLabelColumnName, setAssignLabelColumnName] = useState<string>("");
+  const [assignLabelOption, setAssignLabelOption] = useState("none");
+  const [assignLabelId, setAssignLabelId] = useState<string | null>(null);
+  const [assignLabelName, setAssignLabelName] = useState<string>("");
   const [deleteColumnId, setDeleteColumnId] = useState<number | null>(null);
   const [reorderList, setReorderList] = useState<
     { id: number; order: number }[]
@@ -567,14 +610,45 @@ const KanbanBoard = () => {
           showAddModal={showAddModal}
           onCloseAddModal={() => {
             setNewColumnName("");
+            setNewColumnLabelOption("none");
+            setNewColumnLabelId(null);
+            setNewColumnLabelName("");
             setShowAddModal(false);
           }}
+          errorMessage={errorMessage}
+          onErrorMessageChange={(message) => setErrorMessage(message)}
+          newLabelOption={newColumnLabelOption}
+          onChangeLabelOption={setNewColumnLabelOption}
+          newLabelId={newColumnLabelId}
+          onChangeLabelId={setNewColumnLabelId}
+          newLabelName={newColumnLabelName}
+          onChangeLabelName={setNewColumnLabelName}
           newColumnName={newColumnName}
           onChangeColumnName={setNewColumnName}
           onCreateColumn={() => {
-            if (!newColumnName.trim()) return;
+            if (!newColumnName.trim()) {
+              setErrorMessage({ message: "Column name is required.", target: "newColumnName" });
+              return;
+            };
+
+            if (newColumnLabelOption === "existing" && !newColumnLabelId && !newColumnLabelName.trim()) {
+              setErrorMessage({ message: "Please select an existing label or enter a label name.", target: "newLabel" });
+              return;
+            }
+
+            if (newColumnLabelOption === "new" && !newColumnLabelName.trim()) {
+              setErrorMessage({ message: "Please enter a name for the new label.", target: "newLabel" });
+              return;
+            }
+
             createColumn(
-              { name: newColumnName.trim(), labelOption: "none" },
+              { 
+                name: newColumnName.trim(), 
+                labelOption: newColumnLabelOption as any, 
+                existingLabelId: newColumnLabelOption === "existing" ? newColumnLabelId || undefined : undefined, 
+                existingLabelName: newColumnLabelOption === "existing" ? newColumnLabelName : undefined, 
+                newLabelName: newColumnLabelOption === "new" ? newColumnLabelName : undefined,
+              },
               {
                 onSuccess: () => {
                   queryClient.invalidateQueries({
@@ -584,6 +658,9 @@ const KanbanBoard = () => {
                     queryKey: kanbanKeys.columns(),
                   });
                   setNewColumnName("");
+                  setNewColumnLabelOption("none");
+                  setNewColumnLabelId(null);
+                  setNewColumnLabelName("");
                   setShowAddModal(false);
                 },
               }
@@ -615,6 +692,57 @@ const KanbanBoard = () => {
               }
             );
           }}
+          
+          showAssignLabelModal={showAssignLabelModal}
+          onCloseAssignLabelModal={() => setShowAssignLabelModal(false)}
+          onChangeAssignLabelOption={setAssignLabelOption}
+          assignLabelOption={assignLabelOption}
+          assignLabelId={assignLabelId}
+          onChangeAssignLabelName={setAssignLabelName}
+          onChangeAssignLabelId={setAssignLabelId}
+          onAssignLabel={() => {
+            if (!assignLabelColumnId || !assignLabelColumnName.trim()) return;
+
+            if (assignLabelOption === "existing" && !assignLabelId && !assignLabelName.trim()) {
+              setErrorMessage({ message: "Please select an existing label or enter a label name.", target: "assignLabel" });
+              return;
+            }
+
+            if (assignLabelOption === "new" && !assignLabelName.trim()) {
+              setErrorMessage({ message: "Please enter a name for the new label.", target: "assignLabel" });
+              return;
+            }
+
+            updateColumn(
+              {
+                columnId: assignLabelColumnId,
+                dto: { 
+                  name: assignLabelColumnName,
+                  labelOption: assignLabelOption as any,
+                  existingLabelId: assignLabelOption === "existing" ? assignLabelId || undefined : undefined,
+                  existingLabelName: assignLabelOption === "existing" ? assignLabelName : undefined,
+                  newLabelName: assignLabelOption === "new" ? assignLabelName : undefined,
+                },
+              },
+              {
+                onSuccess: () => {
+                  queryClient.invalidateQueries({
+                    queryKey: kanbanKeys.metadata(),
+                  });
+                  queryClient.invalidateQueries({
+                    queryKey: kanbanKeys.columns(),
+                  });
+                  setAssignLabelColumnId(null);
+                  setAssignLabelColumnName("");
+                  setAssignLabelOption("none");
+                  setAssignLabelId(null);
+                  setAssignLabelName("");
+                  setShowAssignLabelModal(false);
+                },
+              }
+            );
+          }}
+
           showDeleteModal={showDeleteModal}
           onCloseDeleteModal={() => setShowDeleteModal(false)}
           onDeleteColumn={() => {
@@ -791,6 +919,13 @@ const KanbanBoard = () => {
                     setRenameColumnId(column.id);
                     setRenameColumnName(column.name);
                     setShowRenameModal(true);
+                  }}
+                  onAssignLabel={() => {
+                    setAssignLabelColumnId(column.id);
+                    setAssignLabelColumnName(column.name);
+                    setAssignLabelOption(column.labelIds?.length && column.labelIds[0] !== null ? "existing" : "none");
+                    setAssignLabelId(column.labelIds?.[0] || null);
+                    setShowAssignLabelModal(true);
                   }}
                   onDeleteColumn={() => {
                     setDeleteColumnId(column.id);

@@ -11,6 +11,7 @@ import {
   updateKanbanColumn,
   deleteKanbanColumn,
   reorderKanbanColumns,
+  getAvailableLabels,
 } from "@/services/kanban/api";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -34,6 +35,7 @@ export const kanbanKeys = {
   column: (columnId: KanbanColumnId, query?: GetColumnQueryDto) =>
     [...kanbanKeys.columns(), columnId, query] as const,
   snoozed: () => [...kanbanKeys.all, "snoozed"] as const,
+  availableLabels: () => [...kanbanKeys.all, "availableLabels"] as const,
 };
 
 // Hook để lấy metadata các cột Kanban
@@ -158,6 +160,15 @@ export const useSummarizeEmail = () => {
     },
   });
 };
+
+// Hook để lấy danh sách nhãn có thể gán cho cột Kanban
+export const useAvailableLabels = () => {
+  return useQuery({
+    queryKey: kanbanKeys.availableLabels(),
+    queryFn: () => getAvailableLabels(),
+    staleTime: 30000, // 30 seconds
+  });
+}
 
 // Create a new column
 export const useCreateKanbanColumn = () => {

@@ -155,3 +155,14 @@ export const searchEmails = async (data: EmailSearchDto) => {
 
     return response.data.data || { data: [], page: 1, limit: 0, totalResult: 0 };
 };
+
+export const semanticSearchEmails = async (data: EmailSearchDto) => {
+    const client = apiClient.getClient();
+
+    const response = await client.post<ApiResponse<EmailSearchResult>>(
+        `/api/v1/email/search/semantic`,
+        data
+    );
+
+    return response.data.data || { data: [], page: 1, limit: 0, totalResult: 0 };
+};

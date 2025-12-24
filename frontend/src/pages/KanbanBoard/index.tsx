@@ -520,11 +520,6 @@ const KanbanBoard = () => {
         navigate(`/email/${emailId}?from=kanban`);
     };
 
-    const handleViewAllSearch = (query: string) => {
-        setShowSearchResults(true);
-        navigate(`/search?q=${encodeURIComponent(query)}&from=kanban`);
-    };
-
     if (isLoadingEmails || isLoadingColumns) {
         return (
             <div className="flex items-center justify-center h-[calc(100vh-64px)] bg-background">
@@ -545,8 +540,6 @@ const KanbanBoard = () => {
         >
             <div className="h-[calc(100vh-64px)] flex flex-col bg-background">
                 <KanbanHeader
-                    onEmailSelect={handleEmailSelect}
-                    onViewAllSearch={handleViewAllSearch}
                     onToggleFilterPanel={() => setShowFilterPanel(!showFilterPanel)}
                     onToggleHiddenPanel={() => setShowHiddenPanel(!showHiddenPanel)}
                     onRefresh={handleRefresh}

@@ -12,7 +12,12 @@ import { useMailboxes } from "@/hooks/useMailboxes";
 import { formatMailboxName } from "@/lib/utils";
 import { type Folder } from "@/services/mail";
 import type { EmailSearchCard } from "@/services/email/types";
-import { flattenSearchResults, useInfiniteEmailSearch } from "@/hooks/useEmails";
+import {
+    flattenSearchResults,
+    useInfiniteEmailSearch,
+    useInfiniteEmailSemanticSearch,
+} from "@/hooks/useEmails";
+import { SemanticSearchBar } from "@/components/SemanticSearchBar";
 
 const mailboxIcons: Record<string, React.ReactNode> = {
     inbox: <Mail className="w-4 h-4" />,
@@ -28,6 +33,7 @@ export default function SearchResultsPage() {
     const [searchParams, setSearchParams] = useSearchParams();
     const queryFromUrl = searchParams.get("q") || "";
     const fromFromUrl = searchParams.get("from") || "";
+    const searchMode = searchParams.get("mode") || "fuzzy";
 
     const { mailboxes, isLoading: isLoadingMailboxes } = useMailboxes();
     const [folders, setFolders] = useState<Folder[]>([]);
@@ -42,17 +48,26 @@ export default function SearchResultsPage() {
         hasNextPage,
         fetchNextPage,
         isFetchingNextPage,
-    } = useInfiniteEmailSearch(debouncedQuery);
+    } = useInfiniteEmailSearch(debouncedQuery, searchMode === "semantic" ? false : true);
+
+    const {
+        data: semanticData,
+        isLoading: isSemanticSearching,
+        isFetching: isSemanticFetching,
+        hasNextPage: hasSemanticNextPage,
+        fetchNextPage: fetchSemanticNextPage,
+        isFetchingNextPage: isSemanticFetchingNextPage,
+    } = useInfiniteEmailSemanticSearch(debouncedQuery, searchMode === "semantic" ? true : false);
 
     // Flatten all pages into single array
-    const results = flattenSearchResults(data);
+    const results = flattenSearchResults(data || semanticData);
     const totalResults = data?.pages?.[0]?.totalResult || results.length;
 
     // Infinite scroll sentinel
     const sentinelRef = useInfiniteScroll({
-        hasMore: hasNextPage || false,
-        isLoading: isFetchingNextPage,
-        onLoadMore: fetchNextPage,
+        hasMore: searchMode === "semantic" ? hasSemanticNextPage : hasNextPage,
+        isLoading: searchMode === "semantic" ? isSemanticFetchingNextPage : isFetchingNextPage,
+        onLoadMore: searchMode === "semantic" ? fetchSemanticNextPage : fetchNextPage,
     });
 
     // Setup folders
@@ -78,7 +93,11 @@ export default function SearchResultsPage() {
 
     // Handler when clicking email from dropdown preview
     const handleEmailSelectFromDropdown = (emailId: string) => {
-        navigate(`/email/${emailId}?from=search&q=${encodeURIComponent(queryFromUrl)}`);
+        navigate(
+            `/email/${emailId}?from=search&q=${encodeURIComponent(queryFromUrl)}${
+                searchMode === "semantic" ? "&mode=semantic" : ""
+            }`
+        );
     };
 
     // Handler when "View All" or Enter pressed in search bar
@@ -89,7 +108,11 @@ export default function SearchResultsPage() {
     };
 
     const handleEmailClick = (email: EmailSearchCard) => {
-        navigate(`/email/${email.id}?from=search&q=${encodeURIComponent(queryFromUrl)}`);
+        navigate(
+            `/email/${email.id}?from=search&q=${encodeURIComponent(queryFromUrl)}${
+                searchMode === "semantic" ? "&mode=semantic" : ""
+            }`
+        );
     };
 
     const handleFolderClick = (folderId: string) => {
@@ -105,7 +128,7 @@ export default function SearchResultsPage() {
     };
 
     // Show initial loading overlay
-    const showLoadingOverlay = isSearching && results.length === 0;
+    const showLoadingOverlay = (isSemanticSearching || isSearching) && results.length === 0;
 
     return (
         <div className="h-[calc(100vh-64px)] flex">
@@ -174,11 +197,19 @@ export default function SearchResultsPage() {
                     </div>
 
                     {/* Fuzzy Search Bar */}
-                    <FuzzySearchBar
-                        onEmailSelect={handleEmailSelectFromDropdown}
-                        onViewAll={handleViewAllFromSearch}
-                        initialQuery={queryFromUrl}
-                    />
+                    {searchMode === "semantic" ? (
+                        <SemanticSearchBar
+                            onEmailSelect={handleEmailSelectFromDropdown}
+                            onViewAll={handleViewAllFromSearch}
+                            initialQuery={queryFromUrl}
+                        />
+                    ) : (
+                        <FuzzySearchBar
+                            onEmailSelect={handleEmailSelectFromDropdown}
+                            onViewAll={handleViewAllFromSearch}
+                            initialQuery={queryFromUrl}
+                        />
+                    )}
 
                     {/* Results info */}
                     {queryFromUrl && (
@@ -193,7 +224,7 @@ export default function SearchResultsPage() {
                                     {totalResults} {totalResults === 1 ? "result" : "results"}
                                 </Badge>
                             )}
-                            {isFetching && !showLoadingOverlay && (
+                            {(isSemanticFetching || isFetching) && !showLoadingOverlay && (
                                 <Loader2 className="w-4 h-4 ml-3 animate-spin text-muted-foreground" />
                             )}
                         </div>

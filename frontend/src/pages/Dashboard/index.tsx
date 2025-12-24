@@ -13,6 +13,7 @@ import {
     Trash,
     Search,
     Sparkles,
+    TextSearch,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 
@@ -41,6 +42,7 @@ import {
 import type { EmailMessage } from "@/services/mailboxes";
 import type { ThreadMessage } from "@/services/mailboxes/types";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { SemanticSearchBar } from "@/components/SemanticSearchBar";
 
 const mailboxIcons: Record<string, React.ReactNode> = {
     inbox: <Mail className="w-4 h-4" />,
@@ -72,7 +74,7 @@ export default function Dashboard() {
     const [showMobileDetail, setShowMobileDetail] = useState(false);
 
     // Search states
-    const [searchMode, setSearchMode] = useState<"folder" | "fuzzy">("folder");
+    const [searchMode, setSearchMode] = useState<"folder" | "fuzzy" | "semantic">("folder");
     const [folderSearchQuery, setFolderSearchQuery] = useState("");
 
     const [threadMessages, setThreadMessages] = useState<ThreadMessage[]>([]);
@@ -155,12 +157,16 @@ export default function Dashboard() {
 
     // Handlers for fuzzy search
     const handleEmailSelectFromFuzzy = (emailId: string) => {
-        navigate(`/email/${emailId}`);
+        navigate(`/email/${emailId}${searchMode === "semantic" ? "?mode=semantic" : ""}`);
     };
 
     const handleViewAllFuzzyResults = (query: string) => {
         console.log("View all fuzzy results for:", query);
-        navigate(`/search?q=${encodeURIComponent(query)}`);
+        navigate(
+            `/search?q=${encodeURIComponent(query)}${
+                searchMode === "semantic" ? "&mode=semantic" : ""
+            }`
+        );
     };
 
     const handleEmailClick = (email: EmailMessage) => {
@@ -352,6 +358,15 @@ export default function Dashboard() {
                                 <Sparkles className="w-4 h-4 mr-2" />
                                 Fuzzy Search
                             </Button>
+                            <Button
+                                variant={searchMode === "semantic" ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setSearchMode("semantic")}
+                                className="flex-1 cursor-pointer"
+                            >
+                                <TextSearch className="w-4 h-4 mr-2" />
+                                Semantic Search
+                            </Button>
                         </div>
 
                         {/* Conditional Search Input */}
@@ -366,13 +381,19 @@ export default function Dashboard() {
                                     className="pl-10"
                                 />
                             </div>
-                        ) : (
+                        ) : searchMode === "fuzzy" ? (
                             <FuzzySearchBar
                                 onEmailSelect={handleEmailSelectFromFuzzy}
                                 onViewAll={handleViewAllFuzzyResults}
                                 className="max-w-full"
                             />
-                        )}
+                        ) : searchMode === "semantic" ? (
+                            <SemanticSearchBar
+                                onEmailSelect={handleEmailSelectFromFuzzy}
+                                onViewAll={handleViewAllFuzzyResults}
+                                className="max-w-full"
+                            />
+                        ) : null}
 
                         <div className="flex items-center gap-2 flex-wrap">
                             <Button

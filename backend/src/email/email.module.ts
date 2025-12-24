@@ -9,7 +9,7 @@ import { EmailSyncListener } from './listeners/email_sync.listener';
 import { EmailSyncController } from './sync/email_sync.controller';
 import { EmailSearchService } from './search/email_search.service';
 import { EmailSearchController } from './search/email_search.controller';
-import { GenerateEmbeddingListener } from './listeners/generate_embedding.listener';
+import { EmailEmbeddingListener } from './listeners/email_embedding.listener';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Email]), GmailModule],
@@ -19,7 +19,7 @@ import { GenerateEmbeddingListener } from './listeners/generate_embedding.listen
     EmailSynceService,
     EmailSearchService,
     EmailSyncListener,
-    GenerateEmbeddingListener,
+    EmailEmbeddingListener,
   ],
   exports: [EmailService],
 })

@@ -5,9 +5,9 @@ import { In, Repository } from 'typeorm';
 import { Email } from '../entities/email.entity';
 import { gmail_v1 } from 'googleapis';
 import { EmailSyncEvent } from '../events/email_sync.event';
+import { EmailEmbeddingEvent } from '../events/email_embedding.event';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { OpenRouterService } from 'src/open-router/open-router.service';
-import { GenerateEmbeddingsEvent } from '../events/generate_embedding.event';
 
 @Injectable()
 export class EmailSynceService {
@@ -23,8 +23,8 @@ export class EmailSynceService {
     userId: number,
     messages: gmail_v1.Schema$Message[],
     gmailClient: any,
-  ): Promise<void> {
-    if (messages.length === 0) return;
+  ): Promise<string[]> {
+    if (messages.length === 0) return [];
 
     const existingIds = await this.emailRepository.find({
       where: { id: In(messages.map((m) => m.id)) },
@@ -35,7 +35,7 @@ export class EmailSynceService {
       (m) => !existingIdSet.has(m.id || ''),
     );
 
-    if (messagesToFetch.length === 0) return;
+    if (messagesToFetch.length === 0) return [];
 
     const fetchedEmails = await Promise.all(
       messagesToFetch.map(async (msg) => {
@@ -66,17 +66,14 @@ export class EmailSynceService {
 
     const validEmails = fetchedEmails.filter((e) => e !== null);
     if (validEmails.length > 0) {
-      const savedEmails = await this.emailRepository.save(validEmails);
-
-      const savedEmailIds = savedEmails.map((email) => email.id);
-
-      this.eventEmitter.emit(
-        'emails.embeddings.generate',
-        new GenerateEmbeddingsEvent(savedEmailIds),
-      );
+      await this.emailRepository.save(validEmails);
 
       console.log(`Saved ${validEmails.length} emails for user ${userId}`);
+
+      return validEmails.map((email) => email.id);
     }
+
+    return [];
   }
 
   async syncEmailsForUser(userId: number) {
@@ -91,7 +88,18 @@ export class EmailSynceService {
     if (messages.length === 0) return [];
     const nextPageToken = listRes.data.nextPageToken;
 
-    await this.processAndSaveBatch(userId, messages, gmail);
+    const emailIds = await this.processAndSaveBatch(userId, messages, gmail);
+
+    // Trigger background embedding generation
+    if (emailIds.length > 0) {
+      console.log(
+        `Triggering background embedding generation for ${emailIds.length} emails...`,
+      );
+      this.eventEmitter.emit(
+        'email.embedding',
+        new EmailEmbeddingEvent(userId, emailIds, 1),
+      );
+    }
 
     if (nextPageToken) {
       console.log('Triggering background sync...');
@@ -118,5 +126,56 @@ export class EmailSynceService {
         From: ${email.sender}
         Content: ${email.summary || email.snippet || ''}
     `.trim();
+  }
+
+  async generateEmbeddingsForEmails(
+    userId: number,
+    emailIds: string[],
+  ): Promise<string[]> {
+    const BATCH_SIZE = 10;
+    const emailsToProcess = await this.emailRepository
+      .createQueryBuilder('email')
+      .where('email.embedding IS NULL')
+      .andWhere('email.userId = :userId', { userId })
+      .andWhere('email.id IN (:...emailIds)', { emailIds })
+      .take(BATCH_SIZE)
+      .getMany();
+
+    if (emailsToProcess.length === 0) {
+      return [];
+    }
+
+    const updatedEmails = await Promise.all(
+      emailsToProcess.map(async (email) => {
+        try {
+          const textToEmbed = this.prepareTextForEmbedding(email);
+          const vector =
+            await this.openRouterService.generateEmbedding(textToEmbed);
+
+          return {
+            ...email,
+            embedding: vector.length === 1536 ? vector : null,
+          };
+        } catch (error) {
+          console.error(`Failed to generate embedding for ${email.id}`, error);
+          return null;
+        }
+      }),
+    );
+
+    const validEmails = updatedEmails.filter(
+      (e): e is Email => e !== null && e.embedding !== null,
+    );
+    if (validEmails.length > 0) {
+      await this.emailRepository.save(validEmails);
+      console.log(
+        `Generated embeddings for ${validEmails.length} emails (User ${userId})`,
+      );
+    }
+
+    const processedIds = new Set(emailsToProcess.map((email) => email.id));
+    const remainingIds = emailIds.filter((id) => !processedIds.has(id));
+
+    return remainingIds;
   }
 }

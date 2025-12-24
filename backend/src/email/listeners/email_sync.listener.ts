@@ -3,6 +3,7 @@ import { OnEvent, EventEmitter2 } from '@nestjs/event-emitter';
 import { GmailService } from '../../gmail/gmail.service';
 import { EmailSynceService } from '../sync/email_sync.service';
 import { EmailSyncEvent } from '../events/email_sync.event';
+import { EmailEmbeddingEvent } from '../events/email_embedding.event';
 
 @Injectable()
 export class EmailSyncListener {
@@ -42,7 +43,22 @@ export class EmailSyncListener {
       const messages = listRes.data.messages || [];
       const nextPageToken = listRes.data.nextPageToken;
 
-      await this.emailSyncService.processAndSaveBatch(userId, messages, gmail);
+      const emailIds = await this.emailSyncService.processAndSaveBatch(
+        userId,
+        messages,
+        gmail,
+      );
+
+      // Trigger background embedding generation
+      if (emailIds.length > 0) {
+        this.logger.debug(
+          `Triggering background embedding generation for ${emailIds.length} emails...`,
+        );
+        this.eventEmitter.emit(
+          'email.embedding',
+          new EmailEmbeddingEvent(userId, emailIds, 1),
+        );
+      }
 
       await this.sleep(1000);
 

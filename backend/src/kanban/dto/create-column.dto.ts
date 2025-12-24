@@ -30,8 +30,11 @@ export class CreateColumnDto {
     required: false,
     example: 'Label_123',
   })
-  @IsOptional()
+  @ValidateIf((o) => o.labelOption === 'existing')
   @IsString()
+  @IsNotEmpty({
+    message: 'existingLabelId is required when labelOption is existing',
+  })
   existingLabelId?: string;
 
   @ApiProperty({
@@ -48,19 +51,11 @@ export class CreateColumnDto {
     required: false,
     example: 'Kanban/Planning',
   })
-  @IsOptional()
+  @ValidateIf((o) => o.labelOption === 'new')
   @IsString()
   @Length(1, 100)
-  newLabelName?: string;
-
-  // Conditional validation - only validate if labelOption is provided
-  @ValidateIf((o) => o.labelOption === 'existing')
   @IsNotEmpty({
-    message: 'existingLabelId is required when labelOption is existing',
+    message: 'newLabelName is required when labelOption is new',
   })
-  _existingLabelIdRequired?: string;
-
-  @ValidateIf((o) => o.labelOption === 'new')
-  @IsNotEmpty({ message: 'newLabelName is required when labelOption is new' })
-  _newLabelNameRequired?: string;
+  newLabelName?: string;
 }

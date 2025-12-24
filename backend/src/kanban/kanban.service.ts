@@ -165,17 +165,40 @@ export class KanbanService {
     try {
       const labels = await this.gmailService.listLabels_v2(userId);
 
+      const userColumns = await this.columnConfigRepository.find({
+        where: { userId, isActive: true },
+      });
+      const assignedLabelIds = userColumns.map((column) => column.gmailLabel);
+
       const formattedLabels: AvailableLabelDto[] = await Promise.all(
         labels.map(async (label) => ({
           id: label.id!,
           name: label.name!,
           type: this.getLabelType(label),
           isKanbanLabel: this.isKanbanLabel(label.name!),
-          emailCount: await this.getEmailCountForLabel(userId, label.id!),
+          isAssigned: assignedLabelIds.includes(label.id!),
+          emailCount: await this.getEmailCountForLabel(userId, label.name!),
         })),
       );
 
-      return formattedLabels.sort((a, b) => {
+      // remove inbox, draft, spam, sent, trash, categories
+      const filteredLabels = formattedLabels.filter(
+        (label) =>
+          ![
+            'INBOX',
+            'DRAFT',
+            'SPAM',
+            'SENT',
+            'TRASH',
+            'CATEGORY_FORUMS',
+            'CATEGORY_PERSONAL',
+            'CATEGORY_PROMOTIONS',
+            'CATEGORY_SOCIAL',
+            'CATEGORY_UPDATES',
+          ].includes(label.id) && label.name !== 'Kanban/Snoozed',
+      );
+
+      return filteredLabels.sort((a, b) => {
         // Sort:  system first, then user labels, then kanban labels
         const typeOrder = { system: 0, user: 1, kanban: 2 };
         return (

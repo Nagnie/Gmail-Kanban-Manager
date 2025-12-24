@@ -149,7 +149,7 @@ export const searchEmails = async (data: EmailSearchDto) => {
     const client = apiClient.getClient();
 
     const response = await client.post<ApiResponse<EmailSearchResult>>(
-        `/api/v1/email/search`,
+        `/api/v1/email/search/fuzzy`,
         data
     );
 

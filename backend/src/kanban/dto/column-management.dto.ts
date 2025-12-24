@@ -48,6 +48,12 @@ export class AvailableLabelDto {
   })
   isKanbanLabel: boolean;
 
+  @ApiProperty({
+    description: 'Is this label already assigned to a column',
+    example: true,
+  })
+  isAssigned: boolean;
+
   @ApiProperty({ description: 'Number of emails with this label', example: 5 })
   emailCount?: number;
 }

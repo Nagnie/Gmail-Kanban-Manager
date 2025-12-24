@@ -608,17 +608,17 @@ export class KanbanService {
     }
 
     // Check if column has emails
-    if (column.hasEmailSync && column.gmailLabel) {
-      const emailCount = await this.getEmailCountForLabel(
-        userId,
-        column.gmailLabel,
-      );
-      if (emailCount > 0) {
-        throw new BadRequestException(
-          `Cannot delete column "${column.name}" because it contains ${emailCount} emails.  Please move or delete the emails first.`,
-        );
-      }
-    }
+    // if (column.hasEmailSync && column.gmailLabel) {
+    //   const emailCount = await this.getEmailCountForLabel(
+    //     userId,
+    //     column.gmailLabel,
+    //   );
+    //   if (emailCount > 0) {
+    //     throw new BadRequestException(
+    //       `Cannot delete column "${column.name}" because it contains ${emailCount} emails.  Please move or delete the emails first.`,
+    //     );
+    //   }
+    // }
 
     // Soft delete
     column.isActive = false;

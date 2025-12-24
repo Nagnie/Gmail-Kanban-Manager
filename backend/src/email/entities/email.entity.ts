@@ -37,6 +37,12 @@ export class Email {
   @Column('text', { default: '' })
   summary: string;
 
+  @Column({
+    type: 'vector',
+    nullable: true,
+  })
+  embedding: number[] | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamp' })
   createdAt: Date;
 

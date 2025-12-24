@@ -6,6 +6,8 @@ import { Email } from '../entities/email.entity';
 import { gmail_v1 } from 'googleapis';
 import { EmailSyncEvent } from '../events/email_sync.event';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { OpenRouterService } from 'src/open-router/open-router.service';
+import { GenerateEmbeddingsEvent } from '../events/generate_embedding.event';
 
 @Injectable()
 export class EmailSynceService {
@@ -14,6 +16,7 @@ export class EmailSynceService {
     @InjectRepository(Email)
     private readonly emailRepository: Repository<Email>,
     private readonly gmailService: GmailService,
+    private readonly openRouterService: OpenRouterService,
   ) {}
 
   public async processAndSaveBatch(
@@ -60,9 +63,18 @@ export class EmailSynceService {
         }
       }),
     );
+
     const validEmails = fetchedEmails.filter((e) => e !== null);
     if (validEmails.length > 0) {
-      await this.emailRepository.save(validEmails);
+      const savedEmails = await this.emailRepository.save(validEmails);
+
+      const savedEmailIds = savedEmails.map((email) => email.id);
+
+      this.eventEmitter.emit(
+        'emails.embeddings.generate',
+        new GenerateEmbeddingsEvent(savedEmailIds),
+      );
+
       console.log(`Saved ${validEmails.length} emails for user ${userId}`);
     }
   }
@@ -98,5 +110,13 @@ export class EmailSynceService {
 
   private getHeader(headers: any[], name: string): string {
     return headers.find((h) => h.name === name)?.value || '';
+  }
+
+  private prepareTextForEmbedding(email: any): string {
+    return `
+        Subject: ${email.subject}
+        From: ${email.sender}
+        Content: ${email.summary || email.snippet || ''}
+    `.trim();
   }
 }

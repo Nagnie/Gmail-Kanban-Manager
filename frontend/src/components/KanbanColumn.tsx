@@ -25,24 +25,24 @@ import {
 import { useMemo } from "react";
 import { MoreVertical } from "lucide-react";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
 interface KanbanColumnProps {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  column: any;
-  settings: ColumnSettings;
-  searchVisible: boolean;
-  summarizingId: string | null;
-  onUpdateSettings: (updater: (prev: ColumnSettings) => ColumnSettings) => void;
-  onToggleSearch: () => void;
-  onSummarize: (emailId: string) => void;
-  onRenameColumn: (columnId: number, currentName: string) => void;
-  onAssignLabel: (columnId: number, currentName: string) => void;
-  onDeleteColumn: (columnId: number) => void;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    column: any;
+    settings: ColumnSettings;
+    searchVisible: boolean;
+    summarizingId: string | null;
+    onUpdateSettings: (updater: (prev: ColumnSettings) => ColumnSettings) => void;
+    onToggleSearch: () => void;
+    onSummarize: (emailId: string) => void;
+    onRenameColumn: (columnId: number, currentName: string) => void;
+    onAssignLabel: (columnId: number, currentName: string) => void;
+    onDeleteColumn: (columnId: number) => void;
 }
 
 const getColumnIcon = (columnName: string) => {
@@ -104,7 +104,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
     onDeleteColumn,
 }) => {
     // Each column fetches its own data
-    const { data, isLoading } = useKanbanColumn(column.id);
+    const { data, isLoading, isFetching } = useKanbanColumn(column.id);
 
     const emails = data?.emails || [];
     const filteredEmails = useMemo(() => applyFiltersAndSort(emails, settings), [emails, settings]);
@@ -113,158 +113,161 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
         settings.filterUnread || settings.filterAttachments || settings.sortBy !== "date-desc";
 
     return (
-      <div className='flex flex-col w-100 bg-sidebar rounded-lg'>
-        {/* Header */}
-        <div className='flex items-center justify-between p-3'>
-          <div className='flex items-center gap-2'>
-            {getColumnIcon(column.name)}
-            <h3 className='font-semibold'>{column.name}</h3>
-            <Badge variant='secondary'>{filteredEmails.length}</Badge>
+        <div className="flex flex-col w-100 bg-sidebar rounded-lg">
+            {/* Header */}
+            <div className="flex items-center justify-between p-3">
+                <div className="flex items-center gap-2">
+                    {getColumnIcon(column.name)}
+                    <h3 className="font-semibold">{column.name}</h3>
+                    <Badge variant="secondary">{filteredEmails.length}</Badge>
 
-            {hasActiveFilters && (
-              <Badge
-                variant='destructive'
-                className='size-5 rounded-full text-[10px]'
-              >
-                {
-                  [
-                    settings.filterUnread,
-                    settings.filterAttachments,
-                    settings.sortBy !== "date-desc",
-                  ].filter(Boolean).length
-                }
-              </Badge>
-            )}
-          </div>
+                    {hasActiveFilters && (
+                        <Badge variant="destructive" className="size-5 rounded-full text-[10px]">
+                            {
+                                [
+                                    settings.filterUnread,
+                                    settings.filterAttachments,
+                                    settings.sortBy !== "date-desc",
+                                ].filter(Boolean).length
+                            }
+                        </Badge>
+                    )}
+                </div>
 
-          <div className='flex items-center gap-1'>
-            <Button
-              variant='ghost'
-              size='icon'
-              className='h-8 w-8 cursor-pointer'
-              onClick={onToggleSearch}
-            >
-              <Search
-                className={`w-4 h-4 ${searchVisible ? "text-primary" : ""}`}
-              />
-            </Button>
+                <div className="flex items-center gap-1">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 cursor-pointer"
+                        onClick={onToggleSearch}
+                    >
+                        <Search className={`w-4 h-4 ${searchVisible ? "text-primary" : ""}`} />
+                    </Button>
 
-            <ColumnFilterMenu
-              columnId={column.id.toString()}
-              settings={settings}
-              onChange={(next) => onUpdateSettings(() => next)}
-            />
-          </div>
-        </div>
-
-        {/* Search Bar */}
-        {searchVisible && (
-          <div className='px-3 pb-3 animate-in slide-in-from-top-2 duration-200'>
-            <div className='relative'>
-              <Search className='absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground' />
-              <Input
-                className='pl-7 pr-7 h-8 text-xs'
-                placeholder='Search in this column...'
-                value={settings.search}
-                onChange={(e) => {
-                  onUpdateSettings((prev) => ({
-                    ...prev,
-                    search: e.target.value,
-                  }));
-                }}
-                autoFocus
-              />
-              {settings.search && (
-                <Button
-                  type='button'
-                  variant='ghost'
-                  size='icon'
-                  className='absolute right-0 top-1/2 -translate-y-1/2 h-6 w-6'
-                  onClick={() =>
-                    onUpdateSettings((prev) => ({
-                      ...prev,
-                      search: "",
-                    }))
-                  }
-                >
-                  <X className='w-3 h-3' />
-                </Button>
-              )}
+                    <ColumnFilterMenu
+                        columnId={column.id.toString()}
+                        settings={settings}
+                        onChange={(next) => onUpdateSettings(() => next)}
+                    />
+                </div>
             </div>
-          </div>
-        )}
 
-        {/* Droppable Area */}
-        <DroppableColumn id={column.id.toString()}>
-          <div className='space-y-3 min-h-[200px]'>
-            {isLoading ? (
-              <div className='flex justify-center py-12'>
-                <Loader2 className='w-8 h-8 animate-spin text-muted-foreground' />
-              </div>
-            ) : filteredEmails.length === 0 ? (
-              <div className='flex flex-col items-center justify-center py-12 text-muted-foreground'>
-                <Mail className='w-12 h-12 mb-2 opacity-50' />
-                <p className='text-sm'>
-                  {hasActiveFilters
-                    ? "No emails match filters"
-                    : "Drop emails here"}
-                </p>
-              </div>
-            ) : (
-              filteredEmails.map((email: EmailCardDto) => (
-                <DraggableEmailCard
-                  key={email.id}
-                  email={email}
-                  source={column.id.toString()}
-                  onSummarize={onSummarize}
-                  isSummarizing={summarizingId === email.id}
-                />
-              ))
+            {/* Search Bar */}
+            {searchVisible && (
+                <div className="px-3 pb-3 animate-in slide-in-from-top-2 duration-200">
+                    <div className="relative">
+                        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                        <Input
+                            className="pl-7 pr-7 h-8 text-xs"
+                            placeholder="Search in this column..."
+                            value={settings.search}
+                            onChange={(e) => {
+                                onUpdateSettings((prev) => ({
+                                    ...prev,
+                                    search: e.target.value,
+                                }));
+                            }}
+                            autoFocus
+                        />
+                        {settings.search && (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="absolute right-0 top-1/2 -translate-y-1/2 h-6 w-6"
+                                onClick={() =>
+                                    onUpdateSettings((prev) => ({
+                                        ...prev,
+                                        search: "",
+                                    }))
+                                }
+                            >
+                                <X className="w-3 h-3" />
+                            </Button>
+                        )}
+                    </div>
+                </div>
             )}
-          </div>
-        </DroppableColumn>
-        <div className='p-4 border-b bg-card flex items-center justify-between'>
-          <div className='flex items-center gap-2'>
-            {/* existing icon and title */}
-          </div>
 
-          <div className='flex items-center gap-2'>
-            {/* existing search button */}
+            {/* Droppable Area */}
+            <DroppableColumn id={column.id.toString()}>
+                <div className="space-y-3 min-h-[200px]">
+                    {isLoading || isFetching ? (
+                        <div className="flex justify-center py-12">
+                            <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+                        </div>
+                    ) : filteredEmails.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
+                            <Mail className="w-12 h-12 mb-2 opacity-50" />
+                            <p className="text-sm">
+                                {hasActiveFilters ? "No emails match filters" : "Drop emails here"}
+                            </p>
+                        </div>
+                    ) : (
+                        filteredEmails.map((email: EmailCardDto) => (
+                            <DraggableEmailCard
+                                key={email.id}
+                                email={email}
+                                source={column.id.toString()}
+                                onSummarize={onSummarize}
+                                isSummarizing={summarizingId === email.id}
+                            />
+                        ))
+                    )}
+                </div>
+            </DroppableColumn>
+            <div className="p-4 border-b bg-card flex items-center justify-between">
+                <div className="flex items-center gap-2">{/* existing icon and title */}</div>
 
-            {/* Thêm dropdown menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant='ghost' size='icon' className='h-8 w-8'>
-                  <MoreVertical className='w-4 h-4' />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align='end'>
-                <DropdownMenuItem
-                  onClick={() => onRenameColumn(column.id, column.name)}
-                  className='cursor-pointer'
-                >
-                  <Pencil className='w-4 h-4 mr-2' />
-                  Rename
-                </DropdownMenuItem>
-                 <DropdownMenuItem
-                  onClick={() => onAssignLabel(column.id, column.name)}
-                  className='cursor-pointer'
-                >
-                  <Tag className='w-4 h-4 mr-2' />
-                  Assign Label
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => onDeleteColumn(column.id)}
-                  className='cursor-pointer text-destructive'
-                >
-                  <Trash2 className='w-4 h-4 mr-2' />
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+                <div className="flex items-center gap-2">
+                    {/* existing search button */}
+
+                    {/* Thêm dropdown menu */}
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="w-4 h-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                                onSelect={() => {
+                                    requestAnimationFrame(() => {
+                                        onRenameColumn(column.id, column.name);
+                                    });
+                                }}
+                                className="cursor-pointer"
+                            >
+                                <Pencil className="w-4 h-4 mr-2" />
+                                Rename
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onSelect={() => {
+                                    requestAnimationFrame(() => {
+                                        onAssignLabel(column.id, column.name);
+                                    });
+                                }}
+                                className="cursor-pointer"
+                            >
+                                <Tag className="w-4 h-4 mr-2" />
+                                Assign Label
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                                onSelect={() => {
+                                    requestAnimationFrame(() => {
+                                        onDeleteColumn(column.id);
+                                    });
+                                }}
+                                className="cursor-pointer text-destructive"
+                            >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Delete
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                </div>
+            </div>
         </div>
-      </div>
     );
 };
 

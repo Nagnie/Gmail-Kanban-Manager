@@ -31,6 +31,8 @@ export interface EmailSearchCard {
     sender: string;
     snippet: string;
     internalDate: string;
+    internal_date: string;
+    similarity: number;
     isRead: boolean;
     summary: string;
     relevance_score: number;

@@ -40,34 +40,27 @@ export default function SearchResultsPage() {
 
     const debouncedQuery = useDebounce(queryFromUrl, 300);
 
-    // Use infinite query hook
-    const {
-        data,
-        isLoading: isSearching,
-        isFetching,
-        hasNextPage,
-        fetchNextPage,
-        isFetchingNextPage,
-    } = useInfiniteEmailSearch(debouncedQuery, searchMode === "semantic" ? false : true);
+    // Determine which mode is active
+    const isSemanticMode = searchMode === "semantic";
 
-    const {
-        data: semanticData,
-        isLoading: isSemanticSearching,
-        isFetching: isSemanticFetching,
-        hasNextPage: hasSemanticNextPage,
-        fetchNextPage: fetchSemanticNextPage,
-        isFetchingNextPage: isSemanticFetchingNextPage,
-    } = useInfiniteEmailSemanticSearch(debouncedQuery, searchMode === "semantic" ? true : false);
+    // Use infinite query hooks - only enable the appropriate one
+    const fuzzyQuery = useInfiniteEmailSearch(debouncedQuery, !isSemanticMode);
+    const semanticQuery = useInfiniteEmailSemanticSearch(debouncedQuery, isSemanticMode);
+
+    // Get data from the active query
+    const activeQuery = isSemanticMode ? semanticQuery : fuzzyQuery;
+    const { data, isLoading, isFetching, hasNextPage, fetchNextPage, isFetchingNextPage } =
+        activeQuery;
 
     // Flatten all pages into single array
-    const results = flattenSearchResults(data || semanticData);
+    const results = flattenSearchResults(data);
     const totalResults = data?.pages?.[0]?.totalResult || results.length;
 
     // Infinite scroll sentinel
     const sentinelRef = useInfiniteScroll({
-        hasMore: searchMode === "semantic" ? hasSemanticNextPage : hasNextPage,
-        isLoading: searchMode === "semantic" ? isSemanticFetchingNextPage : isFetchingNextPage,
-        onLoadMore: searchMode === "semantic" ? fetchSemanticNextPage : fetchNextPage,
+        hasMore: hasNextPage,
+        isLoading: isFetchingNextPage,
+        onLoadMore: fetchNextPage,
     });
 
     // Setup folders
@@ -95,7 +88,7 @@ export default function SearchResultsPage() {
     const handleEmailSelectFromDropdown = (emailId: string) => {
         navigate(
             `/email/${emailId}?from=search&q=${encodeURIComponent(queryFromUrl)}${
-                searchMode === "semantic" ? "&mode=semantic" : ""
+                isSemanticMode ? "&mode=semantic" : ""
             }`
         );
     };
@@ -103,14 +96,17 @@ export default function SearchResultsPage() {
     // Handler when "View All" or Enter pressed in search bar
     const handleViewAllFromSearch = (query: string) => {
         if (query.trim()) {
-            setSearchParams({ q: query.trim() });
+            setSearchParams({
+                q: query.trim(),
+                ...(isSemanticMode && { mode: "semantic" }),
+            });
         }
     };
 
     const handleEmailClick = (email: EmailSearchCard) => {
         navigate(
             `/email/${email.id}?from=search&q=${encodeURIComponent(queryFromUrl)}${
-                searchMode === "semantic" ? "&mode=semantic" : ""
+                isSemanticMode ? "&mode=semantic" : ""
             }`
         );
     };
@@ -128,7 +124,7 @@ export default function SearchResultsPage() {
     };
 
     // Show initial loading overlay
-    const showLoadingOverlay = (isSemanticSearching || isSearching) && results.length === 0;
+    const showLoadingOverlay = isLoading && results.length === 0;
 
     return (
         <div className="h-[calc(100vh-64px)] flex">
@@ -184,7 +180,14 @@ export default function SearchResultsPage() {
                 {/* Header */}
                 <div className="p-4 border-b shrink-0 space-y-3">
                     <div className="flex items-center justify-between gap-3">
-                        <h1 className="text-xl font-semibold">Search Results</h1>
+                        <h1 className="text-xl font-semibold">
+                            Search Results{" "}
+                            {isSemanticMode && (
+                                <Badge variant="outline" className="ml-2">
+                                    Semantic
+                                </Badge>
+                            )}
+                        </h1>
                         <Button
                             variant="ghost"
                             size="sm"
@@ -196,8 +199,8 @@ export default function SearchResultsPage() {
                         </Button>
                     </div>
 
-                    {/* Fuzzy Search Bar */}
-                    {searchMode === "semantic" ? (
+                    {/* Search Bar - dynamically render based on mode */}
+                    {isSemanticMode ? (
                         <SemanticSearchBar
                             onEmailSelect={handleEmailSelectFromDropdown}
                             onViewAll={handleViewAllFromSearch}
@@ -219,12 +222,12 @@ export default function SearchResultsPage() {
                                     Results for: <strong>"{queryFromUrl}"</strong>
                                 </span>
                             </div>
-                            {!isSearching && results.length > 0 && (
+                            {!isLoading && results.length > 0 && (
                                 <Badge variant="secondary" className="ml-3">
                                     {totalResults} {totalResults === 1 ? "result" : "results"}
                                 </Badge>
                             )}
-                            {(isSemanticFetching || isFetching) && !showLoadingOverlay && (
+                            {isFetching && !showLoadingOverlay && (
                                 <Loader2 className="w-4 h-4 ml-3 animate-spin text-muted-foreground" />
                             )}
                         </div>
@@ -289,6 +292,15 @@ export default function SearchResultsPage() {
                                                             % match
                                                         </Badge>
                                                     )}
+                                                {email.similarity && email.similarity > 0 && (
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="h-5 text-xs"
+                                                    >
+                                                        {Math.round(email.similarity * 100)}%
+                                                        similar
+                                                    </Badge>
+                                                )}
                                             </div>
                                             <h3 className="font-semibold mb-1 truncate">
                                                 {email.subject}
@@ -302,7 +314,9 @@ export default function SearchResultsPage() {
                                                 </p>
                                             )}
                                             <p className="text-xs text-muted-foreground mt-2">
-                                                {new Date(+email.internalDate).toLocaleString()}
+                                                {new Date(
+                                                    +email.internalDate || +email.internal_date
+                                                ).toLocaleString()}
                                             </p>
                                         </div>
                                         <Button

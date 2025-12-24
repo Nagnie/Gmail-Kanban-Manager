@@ -44,6 +44,7 @@ export const SemanticSearchBar = ({
         debouncedQuery,
         debouncedQuery.length >= 1 && open
     );
+    console.log("🚀 ~ SemanticSearchBar ~ searchData:", searchData);
 
     const results = searchData?.data || [];
 
@@ -180,10 +181,12 @@ export const SemanticSearchBar = ({
                                                 </p>
                                             </div>
                                             <div className="text-xs text-muted-foreground ml-2 shrink-0">
-                                                {new Date(+email.internalDate).toLocaleDateString(
-                                                    "en-US",
-                                                    { month: "short", day: "numeric" }
-                                                )}
+                                                {new Date(
+                                                    +email.internalDate || +email.internal_date
+                                                ).toLocaleDateString("en-US", {
+                                                    month: "short",
+                                                    day: "numeric",
+                                                })}
                                             </div>
                                         </CommandItem>
                                     ))}

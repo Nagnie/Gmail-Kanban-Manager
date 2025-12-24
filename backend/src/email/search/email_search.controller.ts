@@ -1,9 +1,9 @@
 import {
   Body,
   Controller,
-  Get,
+  HttpCode,
+  HttpStatus,
   Post,
-  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -18,11 +18,25 @@ import { EmailSearchDto } from '../dto/search-email.dto';
 export class EmailSearchController {
   constructor(private readonly emailSearchService: EmailSearchService) {}
 
-  @Post('search')
+  @Post('search/fuzzy')
+  @HttpCode(HttpStatus.OK)
   @ApiSecurity('jwt')
-  syncEmails(@Req() req, @Body() searchDto: EmailSearchDto) {
+  fuzzySearch(@Req() req, @Body() searchDto: EmailSearchDto) {
     const userId: number = req.user.sub;
-    console.log(searchDto);
+
     return this.emailSearchService.searchEmails(userId, searchDto);
+  }
+
+  @Post('search/semantic')
+  @HttpCode(HttpStatus.OK)
+  @ApiSecurity('jwt')
+  semanticSearch(@Req() req, @Body() searchDto: EmailSearchDto) {
+    const userId: number = req.user.sub;
+
+    return this.emailSearchService.semanticSearch(
+      userId,
+      searchDto.query,
+      searchDto.limit,
+    );
   }
 }

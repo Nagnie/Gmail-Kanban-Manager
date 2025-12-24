@@ -1,13 +1,19 @@
-import { registerAs } from "@nestjs/config";
+import { registerAs } from '@nestjs/config';
 
 type OpenRouterConfig = {
-    apiKey: string;
-    baseUrl: string;
-    defaultModel: string;
+  apiKey: string;
+  baseUrl: string;
+  defaultModel: string;
+  embeddingModel: string;
 };
 
-export default registerAs('openRouter', (): OpenRouterConfig => ({
-  apiKey: process.env.OPENROUTER_API_KEY || 'default_api_key',
-  baseUrl: process.env.OPENROUTER_BASE_URL || 'https://api.openrouter.com',
-  defaultModel: process.env.OPENROUTER_MODEL_DEFAULT || 'default_model',
-}));
+export default registerAs(
+  'openRouter',
+  (): OpenRouterConfig => ({
+    apiKey: process.env.OPENROUTER_API_KEY || 'default_api_key',
+    baseUrl: process.env.OPENROUTER_BASE_URL || 'https://api.openrouter.com',
+    defaultModel: process.env.OPENROUTER_MODEL_DEFAULT || 'default_model',
+    embeddingModel:
+      process.env.OPENROUTER_MODEL_EMBEDDING || 'default_embedding_model',
+  }),
+);

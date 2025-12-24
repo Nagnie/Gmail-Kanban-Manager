@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { Email } from '../entities/email.entity';
 import { EmailSearchDto } from '../dto/search-email.dto';
+import { OpenRouterService } from 'src/open-router/open-router.service';
 
 @Injectable()
 export class EmailSearchService {
@@ -10,6 +11,7 @@ export class EmailSearchService {
     @InjectRepository(Email)
     private emailRepository: Repository<Email>,
     private dataSource: DataSource,
+    private readonly openRouterService: OpenRouterService,
   ) {}
 
   async searchEmails(userId: number, dto: EmailSearchDto) {
@@ -63,5 +65,36 @@ export class EmailSearchService {
       limit,
       totalResult: results.length,
     };
+  }
+
+  async semanticSearch(userId: number, queryText: string, limit: number = 20) {
+    // convert search query to vector
+    const queryVector =
+      await this.openRouterService.generateEmbedding(queryText);
+
+    if (queryVector.length === 0) return [];
+
+    const vectorString = JSON.stringify(queryVector);
+
+    const query = `
+        SELECT 
+            id, subject, sender, snippet, summary, internal_date,
+            -- Tính điểm tương đồng (1 - khoảng cách = độ giống)
+            1 - (embedding <=> $1) as similarity
+        FROM emails
+        WHERE 
+            user_id = $2
+            AND embedding IS NOT NULL
+        ORDER BY embedding <=> $1 ASC -- Sắp xếp từ khoảng cách gần nhất
+        LIMIT $3;
+    `;
+
+    const results = await this.dataSource.query(query, [
+      vectorString,
+      userId,
+      limit,
+    ]);
+
+    return results;
   }
 }

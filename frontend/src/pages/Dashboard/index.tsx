@@ -108,7 +108,7 @@ export default function Dashboard() {
 
     const sentinelRef = useInfiniteScroll({
         hasMore: hasNextPage,
-        isLoading: false,
+        isLoading: isFetchingEmails,
         onLoadMore: loadNextPage,
     });
 

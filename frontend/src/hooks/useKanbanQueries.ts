@@ -13,7 +13,13 @@ import {
     reorderKanbanColumns,
     getAvailableLabels,
 } from "@/services/kanban/api";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+    type InfiniteData,
+    useInfiniteQuery,
+    useMutation,
+    useQuery,
+    useQueryClient,
+} from "@tanstack/react-query";
 
 import type {
     KanbanColumnId,
@@ -25,6 +31,7 @@ import type {
     CreateColumnDto,
     UpdateColumnDto,
     ReorderColumnsDto,
+    KanbanColumnDto,
 } from "@/services/kanban/types";
 
 // Query keys
@@ -52,6 +59,35 @@ export const useKanbanColumn = (columnId: KanbanColumnId, query?: GetColumnQuery
     return useQuery({
         queryKey: kanbanKeys.column(columnId, query),
         queryFn: () => getKanbanColumn(columnId, query),
+        staleTime: 30000, // 30 seconds
+        enabled: !!columnId,
+    });
+};
+
+// Hook để lấy dữ liệu một cột với infinite scroll
+export const useInfiniteKanbanColumn = (
+    columnId: KanbanColumnId,
+    query?: Omit<GetColumnQueryDto, "pageToken">
+) => {
+    return useInfiniteQuery<
+        KanbanColumnDto,
+        Error,
+        InfiniteData<KanbanColumnDto, string | undefined>,
+        readonly ["kanban", "columns", KanbanColumnId, GetColumnQueryDto | undefined],
+        string | undefined
+    >({
+        queryKey: kanbanKeys.column(columnId, query),
+        queryFn: async ({ pageParam }) => {
+            const result = await getKanbanColumn(columnId, { ...query, pageToken: pageParam });
+            if (!result) {
+                throw new Error("Failed to fetch kanban column data");
+            }
+            return result;
+        },
+        getNextPageParam: (lastPage) => {
+            return lastPage.pagination?.hasMore ? lastPage.pagination.nextPageToken : undefined;
+        },
+        initialPageParam: undefined,
         staleTime: 30000, // 30 seconds
         enabled: !!columnId,
     });

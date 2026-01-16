@@ -2,7 +2,8 @@ import { ColumnFilterMenu } from "@/components/ColumnFilterMenu";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useKanbanColumn } from "@/hooks/useKanbanQueries";
+import { useInfiniteKanbanColumn } from "@/hooks/useKanbanQueries";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import type { ColumnSettings } from "@/pages/KanbanBoard";
 import { DraggableEmailCard } from "@/pages/KanbanBoard/components/DraggableEmailCard";
 import { DroppableColumn } from "@/pages/KanbanBoard/components/DroppableColumn";
@@ -105,11 +106,21 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
     onAssignLabel,
     onDeleteColumn,
 }) => {
-    // Each column fetches its own data
-    const { data, isLoading, isFetching } = useKanbanColumn(column.id);
+    // Each column fetches its own data with infinite scroll
+    const { data, isLoading, isFetching, hasNextPage, fetchNextPage } = useInfiniteKanbanColumn(
+        column.id
+    );
 
-    const emails = data?.emails || [];
+    // Flatten all pages into a single array of emails
+    const emails = data?.pages.flatMap((page) => page.emails) || [];
     const filteredEmails = useMemo(() => applyFiltersAndSort(emails, settings), [emails, settings]);
+
+    // Set up infinite scroll
+    const sentinelRef = useInfiniteScroll({
+        hasMore: hasNextPage ?? false,
+        isLoading: isFetching,
+        onLoadMore: fetchNextPage,
+    });
 
     const hasActiveFilters =
         settings.filterUnread || settings.filterAttachments || settings.sortBy !== "date-desc";
@@ -210,16 +221,25 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
                             </p>
                         </div>
                     ) : (
-                        filteredEmails.map((email: EmailCardDto) => (
-                            <DraggableEmailCard
-                                key={email.id}
-                                email={email}
-                                source={column.id.toString()}
-                                onSummarize={onSummarize}
-                                onHide={onHideEmail}
-                                isSummarizing={summarizingId === email.id}
-                            />
-                        ))
+                        <>
+                            {filteredEmails.map((email: EmailCardDto) => (
+                                <DraggableEmailCard
+                                    key={email.id}
+                                    email={email}
+                                    source={column.id.toString()}
+                                    onSummarize={onSummarize}
+                                    onHide={onHideEmail}
+                                    isSummarizing={summarizingId === email.id}
+                                />
+                            ))}
+
+                            {/* Infinite scroll sentinel */}
+                            {hasNextPage && (
+                                <div ref={sentinelRef} className="flex justify-center py-4">
+                                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
             </DroppableColumn>

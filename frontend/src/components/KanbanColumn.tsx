@@ -24,6 +24,7 @@ import {
     X,
 } from "lucide-react";
 import { useMemo } from "react";
+import Fuse from "fuse.js";
 import { MoreVertical } from "lucide-react";
 import {
     DropdownMenu,
@@ -67,14 +68,22 @@ const applyFiltersAndSort = (emails: EmailCardDto[], settings: ColumnSettings) =
         filtered = filtered.filter((email) => email.hasAttachments);
     }
 
+    // 🔍 Fuzzy search với Fuse.js
     if (settings.search.trim()) {
-        const q = settings.search.toLowerCase();
-        filtered = filtered.filter((email) => {
-            const text = `${email.subject} ${email.fromName || ""} ${email.from || ""} ${
-                email.snippet || ""
-            }`.toLowerCase();
-            return text.includes(q);
+        const fuse = new Fuse(filtered, {
+            keys: [
+                { name: "subject", weight: 0.4 },
+                { name: "fromName", weight: 0.3 },
+                { name: "from", weight: 0.2 },
+                { name: "snippet", weight: 0.1 },
+            ],
+            threshold: 0.4,
+            includeScore: true,
+            ignoreLocation: true,
         });
+
+        const results = fuse.search(settings.search);
+        filtered = results.map((result) => result.item);
     }
 
     filtered.sort((a, b) => {

@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import {
     kanbanKeys,
-    useKanbanColumn,
+    useInfiniteKanbanColumn,
     useKanbanColumnsMeta,
     useMoveEmail,
     useSnoozedEmails,
@@ -26,7 +26,6 @@ import {
     useDeleteKanbanColumn,
     useReorderKanbanColumns,
 } from "@/hooks/useKanbanQueries";
-import { useMailboxEmails } from "@/hooks/useMailboxEmails";
 import { StaticEmailCard } from "./components/StaticEmailCard";
 import {
     closestCorners,
@@ -192,7 +191,6 @@ const KanbanBoard = () => {
     const [isSearching] = useState(false);
     const [searchResults, setSearchResults] = useState<EmailCardDto[]>([]);
     const [showSearchResults, setShowSearchResults] = useState(false);
-    const [selectedFolder] = useState("INBOX");
     const [showInboxPanel, setShowInboxPanel] = useState(true);
     const [showHiddenPanel, setShowHiddenPanel] = useState(false);
     const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -200,8 +198,6 @@ const KanbanBoard = () => {
 
     const [showSnoozeDialog, setShowSnoozeDialog] = useState(false);
     const [emailToSnooze, setEmailToSnooze] = useState<EmailCardDto | null>(null);
-
-    const { data: inboxData, isLoading: isLoadingInbox } = useKanbanColumn(inboxColumn?.id);
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -211,18 +207,19 @@ const KanbanBoard = () => {
         })
     );
 
+    // Use infinite scroll for inbox column
     const {
-        isLoading: isLoadingEmails,
+        data: inboxData,
+        isLoading: isLoadingInbox,
         isFetching: isFetchingEmails,
         hasNextPage,
-        loadNextPage,
-    } = useMailboxEmails({
-        labelId: selectedFolder,
-        q: searchQuery,
+        fetchNextPage: loadNextPage,
+    } = useInfiniteKanbanColumn(inboxColumn?.id || 0, {
+        search: searchQuery,
     });
 
     const sentinelRef = useInfiniteScroll({
-        hasMore: hasNextPage,
+        hasMore: hasNextPage ?? false,
         isLoading: isFetchingEmails,
         onLoadMore: loadNextPage,
     });
@@ -294,9 +291,11 @@ const KanbanBoard = () => {
         }
     }, [snoozedData]);
 
-    const inboxEmails = (inboxData?.emails || []).filter(
-        (email: EmailCardDto) => !processedEmailIds.has(email.id)
-    );
+    // Flatten inbox emails from all pages
+    const inboxEmails = useMemo(() => {
+        const allEmails = inboxData?.pages.flatMap((page) => page.emails) || [];
+        return allEmails.filter((email: EmailCardDto) => !processedEmailIds.has(email.id));
+    }, [inboxData, processedEmailIds]);
 
     const updateColumnSettings = (
         columnId: string,
@@ -548,7 +547,7 @@ const KanbanBoard = () => {
         navigate(`/email/${emailId}?from=kanban`);
     };
 
-    if (isLoadingEmails || isLoadingColumns) {
+    if (isLoadingInbox || isLoadingColumns) {
         return (
             <div className="flex items-center justify-center h-[calc(100vh-64px)] bg-background">
                 <div className="text-center">

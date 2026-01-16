@@ -35,7 +35,7 @@ export const DraggableEmailCard = ({
         <div
             ref={setNodeRef}
             style={style}
-            className="bg-card w-90 rounded-lg shadow-sm border border-sidebar-border p-4 hover:shadow-md transition-shadow hover:border-mail-selected group"
+            className="bg-card w-full rounded-lg shadow-sm border border-sidebar-border p-3 sm:p-4 hover:shadow-md transition-shadow hover:border-mail-selected group"
         >
             <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-2 flex-1 min-w-0">

@@ -135,9 +135,9 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
         settings.filterUnread || settings.filterAttachments || settings.sortBy !== "date-desc";
 
     return (
-        <div className="flex flex-col w-100 bg-sidebar rounded-lg">
+        <div className="flex flex-col w-72 sm:w-80 md:w-96 lg:w-100 bg-sidebar rounded-lg">
             {/* Header */}
-            <div className="flex items-center justify-between p-3">
+            <div className="flex items-center justify-between p-2 sm:p-3">
                 <div className="flex items-center gap-2">
                     {getColumnIcon(column.name)}
                     <h3 className="font-semibold">{column.name}</h3>
@@ -180,7 +180,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
 
             {/* Search Bar */}
             {searchVisible && (
-                <div className="px-3 pb-3 animate-in slide-in-from-top-2 duration-200">
+                <div className="px-2 sm:px-3 pb-2 sm:pb-3 animate-in slide-in-from-top-2 duration-200">
                     <div className="relative">
                         <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
                         <Input

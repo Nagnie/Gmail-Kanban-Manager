@@ -40,14 +40,16 @@ export const InboxPanel = ({
 }: InboxPanelProps) => {
     return (
         <>
-            <div className="p-4 border-b bg-card flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    {getColumnIcon(column.name)}
-                    <h3 className="font-semibold">{column.name}</h3>
-                    <Badge variant="secondary">{emails.length}</Badge>
+            <div className="p-2 sm:p-3 md:p-4 border-b bg-card flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
+                    <div className="flex-shrink-0">{getColumnIcon(column.name)}</div>
+                    <h3 className="font-semibold text-sm sm:text-base truncate">{column.name}</h3>
+                    <Badge variant="secondary" className="text-xs h-5 px-1.5 flex-shrink-0">
+                        {emails.length}
+                    </Badge>
                 </div>
 
-                <div>
+                <div className="flex items-center gap-1 flex-shrink-0">
                     <Button
                         variant="ghost"
                         size="icon"
@@ -68,8 +70,8 @@ export const InboxPanel = ({
             </div>
 
             {searchVisible && (
-                <div className="px-4 mt-2">
-                    <div className="animate-in slide-in-from-top-2 duration-200 pr-2">
+                <div className="px-2 sm:px-3 md:px-4 mt-2">
+                    <div className="animate-in slide-in-from-top-2 duration-200 pr-1 sm:pr-2">
                         <div className="relative">
                             <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
                             <Input
@@ -105,8 +107,8 @@ export const InboxPanel = ({
                 </div>
             )}
 
-            <div className="flex-1 p-4 overflow-y-auto">
-                <div className="space-y-3">
+            <div className="flex-1 p-2 sm:p-3 md:p-4 overflow-y-auto">
+                <div className="space-y-2 sm:space-y-3">
                     {isLoading ? (
                         <div className="flex justify-center py-12">
                             <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />

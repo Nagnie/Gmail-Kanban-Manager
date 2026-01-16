@@ -416,9 +416,22 @@ const KanbanBoard = () => {
         // Optimistically update source column (remove email)
         queryClient.setQueryData(sourceQueryKey, (old: any) => {
             if (!old) return old;
+
+            // Check if this is infinite query data (has pages property)
+            if (old.pages) {
+                return {
+                    ...old,
+                    pages: old.pages.map((page: any) => ({
+                        ...page,
+                        emails: page.emails?.filter((e: EmailCardDto) => e.id !== email.id) || [],
+                    })),
+                };
+            }
+
+            // Regular query data
             return {
                 ...old,
-                emails: old.emails.filter((e: EmailCardDto) => e.id !== email.id),
+                emails: old.emails?.filter((e: EmailCardDto) => e.id !== email.id) || [],
             };
         });
 
@@ -426,13 +439,35 @@ const KanbanBoard = () => {
         queryClient.setQueryData(targetQueryKey, (old: any) => {
             if (!old) return old;
 
-            // Check if email already exists
-            const emailExists = old.emails.some((e: EmailCardDto) => e.id === email.id);
+            // Check if this is infinite query data (has pages property)
+            if (old.pages) {
+                // Check if email already exists in any page
+                const emailExists = old.pages.some((page: any) =>
+                    page.emails?.some((e: EmailCardDto) => e.id === email.id)
+                );
+                if (emailExists) return old;
+
+                // Add email to the first page
+                return {
+                    ...old,
+                    pages: old.pages.map((page: any, index: number) =>
+                        index === 0
+                            ? {
+                                  ...page,
+                                  emails: [email, ...(page.emails || [])],
+                              }
+                            : page
+                    ),
+                };
+            }
+
+            // Regular query data
+            const emailExists = old.emails?.some((e: EmailCardDto) => e.id === email.id);
             if (emailExists) return old;
 
             return {
                 ...old,
-                emails: [...old.emails, email],
+                emails: [email, ...(old.emails || [])],
             };
         });
 
@@ -508,8 +543,83 @@ const KanbanBoard = () => {
     const handleSnoozeConfirm = (snoozeDto: SnoozeEmailDto) => {
         if (!emailToSnooze) return;
 
-        setHiddenEmails((prev) => [...prev, emailToSnooze as any]);
+        // Find which column contains this email
+        let sourceColumnId: number | null = null;
+        
+        // Check inbox first
+        const inInbox = inboxEmails.some((e: EmailCardDto) => e.id === emailToSnooze.id);
+        if (inInbox && inboxColumn) {
+            sourceColumnId = inboxColumn.id;
+        } else {
+            // Check kanban columns
+            for (const column of kanbanColumns) {
+                const columnData = queryClient.getQueryData<any>(kanbanKeys.column(column.id));
+                let hasEmail = false;
+                
+                if (columnData?.pages) {
+                    // Infinite query
+                    hasEmail = columnData.pages.some((page: any) =>
+                        page.emails?.some((e: EmailCardDto) => e.id === emailToSnooze.id)
+                    );
+                } else if (columnData?.emails) {
+                    // Regular query
+                    hasEmail = columnData.emails.some((e: EmailCardDto) => e.id === emailToSnooze.id);
+                }
+                
+                if (hasEmail) {
+                    sourceColumnId = column.id;
+                    break;
+                }
+            }
+        }
+
+        // Mark email as processed immediately
         setProcessedEmailIds((prev) => new Set(prev).add(emailToSnooze.id));
+        setHiddenEmails((prev) => [...prev, emailToSnooze as any]);
+
+        // Get query keys
+        const sourceQueryKey = sourceColumnId ? kanbanKeys.column(sourceColumnId) : null;
+        const snoozedQueryKey = kanbanKeys.snoozed();
+
+        // Cancel any outgoing refetches
+        if (sourceQueryKey) {
+            queryClient.cancelQueries({ queryKey: sourceQueryKey });
+        }
+        queryClient.cancelQueries({ queryKey: snoozedQueryKey });
+
+        // Snapshot previous values for rollback
+        const previousSourceData = sourceQueryKey ? queryClient.getQueryData(sourceQueryKey) : null;
+        const previousSnoozedData = queryClient.getQueryData(snoozedQueryKey);
+
+        // Optimistically remove email from source column
+        if (sourceQueryKey) {
+            queryClient.setQueryData(sourceQueryKey, (old: any) => {
+                if (!old) return old;
+
+                // Check if this is infinite query data
+                if (old.pages) {
+                    return {
+                        ...old,
+                        pages: old.pages.map((page: any) => ({
+                            ...page,
+                            emails: page.emails?.filter((e: EmailCardDto) => e.id !== emailToSnooze.id) || [],
+                        })),
+                    };
+                }
+
+                // Regular query data
+                return {
+                    ...old,
+                    emails: old.emails?.filter((e: EmailCardDto) => e.id !== emailToSnooze.id) || [],
+                };
+            });
+        }
+
+        // Optimistically add to snoozed list
+        queryClient.setQueryData(snoozedQueryKey, (old: any) => {
+            if (!old) return [emailToSnooze];
+            return [...old, emailToSnooze];
+        });
 
         snoozeEmailMutation(
             {
@@ -519,11 +629,32 @@ const KanbanBoard = () => {
             {
                 onError: (error) => {
                     console.error("Failed to snooze email:", error);
+
+                    // Rollback optimistic updates
+                    if (sourceQueryKey) {
+                        queryClient.setQueryData(sourceQueryKey, previousSourceData);
+                    }
+                    queryClient.setQueryData(snoozedQueryKey, previousSnoozedData);
+
+                    // Rollback local state
                     setHiddenEmails((prev) => prev.filter((e) => e.id !== emailToSnooze.id));
                     setProcessedEmailIds((prev) => {
                         const newSet = new Set(prev);
                         newSet.delete(emailToSnooze.id);
                         return newSet;
+                    });
+                },
+                onSuccess: () => {
+                    // Optional: Silently refetch in background to ensure data consistency
+                    if (sourceQueryKey) {
+                        queryClient.invalidateQueries({
+                            queryKey: sourceQueryKey,
+                            refetchType: "none",
+                        });
+                    }
+                    queryClient.invalidateQueries({
+                        queryKey: snoozedQueryKey,
+                        refetchType: "none",
                     });
                 },
             }
@@ -533,6 +664,11 @@ const KanbanBoard = () => {
     };
 
     const handleUnhideEmail = (emailId: string) => {
+        // Find the snoozed email
+        const snoozedEmail = hiddenEmails.find((e) => e.id === emailId);
+        if (!snoozedEmail) return;
+
+        // Optimistically update local state
         setHiddenEmails((prev) => prev.filter((e) => e.id !== emailId));
         setProcessedEmailIds((prev) => {
             const newSet = new Set(prev);
@@ -540,10 +676,93 @@ const KanbanBoard = () => {
             return newSet;
         });
 
+        // Get query keys
+        const snoozedQueryKey = kanbanKeys.snoozed();
+        const inboxQueryKey = inboxColumn ? kanbanKeys.column(inboxColumn.id) : null;
+
+        // Cancel any outgoing refetches
+        queryClient.cancelQueries({ queryKey: snoozedQueryKey });
+        if (inboxQueryKey) {
+            queryClient.cancelQueries({ queryKey: inboxQueryKey });
+        }
+
+        // Snapshot previous values for rollback
+        const previousSnoozedData = queryClient.getQueryData(snoozedQueryKey);
+        const previousInboxData = inboxQueryKey ? queryClient.getQueryData(inboxQueryKey) : null;
+
+        // Optimistically remove from snoozed list
+        queryClient.setQueryData(snoozedQueryKey, (old: any) => {
+            if (!old) return old;
+            return old.filter((e: any) => e.emailId !== emailId);
+        });
+
+        // Optimistically add back to inbox (if inbox exists)
+        if (inboxQueryKey) {
+            queryClient.setQueryData(inboxQueryKey, (old: any) => {
+                if (!old) return old;
+
+                // Check if this is infinite query data
+                if (old.pages) {
+                    // Check if email already exists
+                    const emailExists = old.pages.some((page: any) =>
+                        page.emails?.some((e: EmailCardDto) => e.id === emailId)
+                    );
+                    if (emailExists) return old;
+
+                    // Add email to the first page
+                    return {
+                        ...old,
+                        pages: old.pages.map((page: any, index: number) =>
+                            index === 0
+                                ? {
+                                      ...page,
+                                      emails: [snoozedEmail as any, ...(page.emails || [])],
+                                  }
+                                : page
+                        ),
+                    };
+                }
+
+                // Regular query data
+                const emailExists = old.emails?.some((e: EmailCardDto) => e.id === emailId);
+                if (emailExists) return old;
+
+                return {
+                    ...old,
+                    emails: [snoozedEmail as any, ...(old.emails || [])],
+                };
+            });
+        }
+
         unsnoozeEmailMutation(emailId, {
             onError: (error) => {
                 console.error("Failed to unsnooze email:", error);
-                queryClient.invalidateQueries({ queryKey: kanbanKeys.snoozed() });
+
+                // Rollback optimistic updates
+                queryClient.setQueryData(snoozedQueryKey, previousSnoozedData);
+                if (inboxQueryKey) {
+                    queryClient.setQueryData(inboxQueryKey, previousInboxData);
+                }
+
+                // Rollback local state
+                setHiddenEmails((prev) => [...prev, snoozedEmail]);
+                setProcessedEmailIds((prev) => new Set(prev).add(emailId));
+
+                // Refresh to ensure consistency
+                queryClient.invalidateQueries({ queryKey: snoozedQueryKey });
+            },
+            onSuccess: () => {
+                // Optional: Silently refetch in background to ensure data consistency
+                queryClient.invalidateQueries({
+                    queryKey: snoozedQueryKey,
+                    refetchType: "none",
+                });
+                if (inboxQueryKey) {
+                    queryClient.invalidateQueries({
+                        queryKey: inboxQueryKey,
+                        refetchType: "none",
+                    });
+                }
             },
         });
     };
@@ -871,7 +1090,7 @@ const KanbanBoard = () => {
                     {inboxColumn && (
                         <div
                             className={`${
-                                showInboxPanel ? "w-100" : "w-0"
+                                showInboxPanel ? "w-full sm:w-80 md:w-96 lg:w-100" : "w-0"
                             } transition-all duration-300 border-r flex flex-col bg-sidebar`}
                         >
                             {showInboxPanel && (
@@ -918,8 +1137,8 @@ const KanbanBoard = () => {
                     )}
 
                     {/* Kanban Board - Dynamic Columns */}
-                    <div className="flex-1 overflow-x-auto p-6">
-                        <div className="flex gap-6 h-full min-w-max">
+                    <div className="flex-1 overflow-x-auto p-2 sm:p-4 md:p-6">
+                        <div className="flex gap-3 sm:gap-4 md:gap-6 h-full min-w-max">
                             {kanbanColumns.map((column) => (
                                 <KanbanColumn
                                     key={column.id}

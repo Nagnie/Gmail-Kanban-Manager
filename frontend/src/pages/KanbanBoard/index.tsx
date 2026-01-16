@@ -474,11 +474,26 @@ const KanbanBoard = () => {
     };
 
     const handleHideEmail = (emailId: string) => {
-        const email = filteredInboxEmails.find((e: EmailCardDto) => e.id === emailId);
+        // Try to find email in inbox first
+        let email = filteredInboxEmails.find((e: EmailCardDto) => e.id === emailId);
+
+        // If not found in inbox, search in all kanban columns
+        if (!email) {
+            // Search through all columns data
+            for (const column of kanbanColumns) {
+                const columnData = queryClient.getQueryData<any>(kanbanKeys.column(column.id));
+                if (columnData?.emails) {
+                    email = columnData.emails.find((e: EmailCardDto) => e.id === emailId);
+                    if (email) break;
+                }
+            }
+        }
 
         if (email) {
             setEmailToSnooze(email);
             setShowSnoozeDialog(true);
+        } else {
+            console.warn("Email not found:", emailId);
         }
     };
 
@@ -918,6 +933,7 @@ const KanbanBoard = () => {
                                     }
                                     onToggleSearch={() => toggleColumnSearch(column.id.toString())}
                                     onSummarize={handleSummarizeEmail}
+                                    onHideEmail={handleHideEmail}
                                     onRenameColumn={() => {
                                         setRenameColumnId(column.id);
                                         setRenameColumnName(column.name);

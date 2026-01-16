@@ -40,6 +40,7 @@ interface KanbanColumnProps {
     onUpdateSettings: (updater: (prev: ColumnSettings) => ColumnSettings) => void;
     onToggleSearch: () => void;
     onSummarize: (emailId: string) => void;
+    onHideEmail?: (emailId: string) => void;
     onRenameColumn: (columnId: number, currentName: string) => void;
     onAssignLabel: (columnId: number, currentName: string) => void;
     onDeleteColumn: (columnId: number) => void;
@@ -99,6 +100,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
     onUpdateSettings,
     onToggleSearch,
     onSummarize,
+    onHideEmail,
     onRenameColumn,
     onAssignLabel,
     onDeleteColumn,
@@ -214,6 +216,7 @@ const KanbanColumn: React.FC<KanbanColumnProps> = ({
                                 email={email}
                                 source={column.id.toString()}
                                 onSummarize={onSummarize}
+                                onHide={onHideEmail}
                                 isSummarizing={summarizingId === email.id}
                             />
                         ))

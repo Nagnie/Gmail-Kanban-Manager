@@ -525,7 +525,19 @@ const KanbanBoard = () => {
             // Search through all columns data
             for (const column of kanbanColumns) {
                 const columnData = queryClient.getQueryData<any>(kanbanKeys.column(column.id));
-                if (columnData?.emails) {
+
+                // Check if this is infinite query data (has pages property)
+                if (columnData?.pages) {
+                    // Search through all pages
+                    for (const page of columnData.pages) {
+                        if (page.emails) {
+                            email = page.emails.find((e: EmailCardDto) => e.id === emailId);
+                            if (email) break;
+                        }
+                    }
+                    if (email) break;
+                } else if (columnData?.emails) {
+                    // Regular query data
                     email = columnData.emails.find((e: EmailCardDto) => e.id === emailId);
                     if (email) break;
                 }
@@ -545,7 +557,7 @@ const KanbanBoard = () => {
 
         // Find which column contains this email
         let sourceColumnId: number | null = null;
-        
+
         // Check inbox first
         const inInbox = inboxEmails.some((e: EmailCardDto) => e.id === emailToSnooze.id);
         if (inInbox && inboxColumn) {
@@ -555,7 +567,7 @@ const KanbanBoard = () => {
             for (const column of kanbanColumns) {
                 const columnData = queryClient.getQueryData<any>(kanbanKeys.column(column.id));
                 let hasEmail = false;
-                
+
                 if (columnData?.pages) {
                     // Infinite query
                     hasEmail = columnData.pages.some((page: any) =>
@@ -563,9 +575,11 @@ const KanbanBoard = () => {
                     );
                 } else if (columnData?.emails) {
                     // Regular query
-                    hasEmail = columnData.emails.some((e: EmailCardDto) => e.id === emailToSnooze.id);
+                    hasEmail = columnData.emails.some(
+                        (e: EmailCardDto) => e.id === emailToSnooze.id
+                    );
                 }
-                
+
                 if (hasEmail) {
                     sourceColumnId = column.id;
                     break;
@@ -602,7 +616,10 @@ const KanbanBoard = () => {
                         ...old,
                         pages: old.pages.map((page: any) => ({
                             ...page,
-                            emails: page.emails?.filter((e: EmailCardDto) => e.id !== emailToSnooze.id) || [],
+                            emails:
+                                page.emails?.filter(
+                                    (e: EmailCardDto) => e.id !== emailToSnooze.id
+                                ) || [],
                         })),
                     };
                 }
@@ -610,7 +627,8 @@ const KanbanBoard = () => {
                 // Regular query data
                 return {
                     ...old,
-                    emails: old.emails?.filter((e: EmailCardDto) => e.id !== emailToSnooze.id) || [],
+                    emails:
+                        old.emails?.filter((e: EmailCardDto) => e.id !== emailToSnooze.id) || [],
                 };
             });
         }

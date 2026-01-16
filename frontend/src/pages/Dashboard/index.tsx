@@ -346,8 +346,8 @@ export default function Dashboard() {
                                 onClick={() => setSearchMode("folder")}
                                 className="flex-1 cursor-pointer"
                             >
-                                <Search className="w-4 h-4 mr-2" />
-                                Folder Search
+                                <Search className="w-4 h-4 md:mr-2" />
+                                <span className="hidden md:inline">Folder Search</span>
                             </Button>
                             <Button
                                 variant={searchMode === "fuzzy" ? "default" : "outline"}
@@ -355,8 +355,8 @@ export default function Dashboard() {
                                 onClick={() => setSearchMode("fuzzy")}
                                 className="flex-1 cursor-pointer"
                             >
-                                <Sparkles className="w-4 h-4 mr-2" />
-                                Fuzzy Search
+                                <Sparkles className="w-4 h-4 md:mr-2" />
+                                <span className="hidden md:inline">Fuzzy Search</span>
                             </Button>
                             <Button
                                 variant={searchMode === "semantic" ? "default" : "outline"}
@@ -364,8 +364,8 @@ export default function Dashboard() {
                                 onClick={() => setSearchMode("semantic")}
                                 className="flex-1 cursor-pointer"
                             >
-                                <TextSearch className="w-4 h-4 mr-2" />
-                                Semantic Search
+                                <TextSearch className="w-4 h-4 md:mr-2" />
+                                <span className="hidden md:inline">Semantic Search</span>
                             </Button>
                         </div>
 
@@ -642,15 +642,10 @@ export default function Dashboard() {
 
                             <ScrollArea className="flex-1 overflow-hidden">
                                 <div className="divide-y">
-                                    {threadMessages.map((message, index) => (
+                                    {threadMessages.map((message) => (
                                         <EmailDetail
                                             key={message.id}
                                             message={message}
-                                            onBack={
-                                                index === 0
-                                                    ? () => setShowMobileDetail(false)
-                                                    : undefined
-                                            }
                                             onReply={(data) => {
                                                 setReplyData(data);
                                                 setComposeMode("reply");

@@ -548,6 +548,20 @@ export default function Dashboard() {
                                                     <div className="text-sm text-muted-foreground line-clamp-1">
                                                         {email.snippet}
                                                     </div>
+                                                    <Button
+                                                        variant="link"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            window.open(
+                                                                `https://mail.google.com/mail/u/0/#all/${email.id}`,
+                                                                "_blank"
+                                                            );
+                                                        }}
+                                                        className="cursor-pointer p-0 mt-1 text-sm text-blue-600"
+                                                        size="sm"
+                                                    >
+                                                        To Gmail
+                                                    </Button>
                                                 </div>
                                                 <Button
                                                     variant={"ghost"}

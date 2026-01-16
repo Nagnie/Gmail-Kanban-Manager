@@ -44,8 +44,14 @@ import { InboxPanel } from "./components/InboxPanel";
 import { HiddenEmailsPanel } from "./components/HiddenEmailsPanel";
 import { KanbanHeader } from "./components/KanbanHeader";
 import { FilterPanel } from "./components/FilterPanel";
+import { SnoozeDialog } from "./components/SnoozeDialog";
 
-import type { EmailCardDto, KanbanColumnId, SnoozeResponseDto } from "@/services/kanban/types";
+import type {
+    EmailCardDto,
+    KanbanColumnId,
+    SnoozeResponseDto,
+    SnoozeEmailDto,
+} from "@/services/kanban/types";
 import { useNavigate } from "react-router-dom";
 import KanbanColumn from "@/components/KanbanColumn";
 import { useAppSelector } from "@/hooks/redux";
@@ -191,6 +197,9 @@ const KanbanBoard = () => {
     const [showHiddenPanel, setShowHiddenPanel] = useState(false);
     const [showFilterPanel, setShowFilterPanel] = useState(false);
     const [processedEmailIds, setProcessedEmailIds] = useState<Set<string>>(new Set());
+
+    const [showSnoozeDialog, setShowSnoozeDialog] = useState(false);
+    const [emailToSnooze, setEmailToSnooze] = useState<EmailCardDto | null>(null);
 
     const { data: inboxData, isLoading: isLoadingInbox } = useKanbanColumn(inboxColumn?.id);
 
@@ -468,32 +477,36 @@ const KanbanBoard = () => {
         const email = filteredInboxEmails.find((e: EmailCardDto) => e.id === emailId);
 
         if (email) {
-            setHiddenEmails((prev) => [...prev, email as any]);
-            setProcessedEmailIds((prev) => new Set(prev).add(emailId));
-
-            snoozeEmailMutation(
-                {
-                    emailId,
-                    snoozeDto: {
-                        // preset: "tomorrow",
-                        // test 1 minute later
-                        preset: "custom",
-                        customDate: new Date(Date.now() + 1 * 60 * 1000).toISOString(),
-                    },
-                },
-                {
-                    onError: (error) => {
-                        console.error("Failed to snooze email:", error);
-                        setHiddenEmails((prev) => prev.filter((e) => e.id !== emailId));
-                        setProcessedEmailIds((prev) => {
-                            const newSet = new Set(prev);
-                            newSet.delete(emailId);
-                            return newSet;
-                        });
-                    },
-                }
-            );
+            setEmailToSnooze(email);
+            setShowSnoozeDialog(true);
         }
+    };
+
+    const handleSnoozeConfirm = (snoozeDto: SnoozeEmailDto) => {
+        if (!emailToSnooze) return;
+
+        setHiddenEmails((prev) => [...prev, emailToSnooze as any]);
+        setProcessedEmailIds((prev) => new Set(prev).add(emailToSnooze.id));
+
+        snoozeEmailMutation(
+            {
+                emailId: emailToSnooze.id,
+                snoozeDto,
+            },
+            {
+                onError: (error) => {
+                    console.error("Failed to snooze email:", error);
+                    setHiddenEmails((prev) => prev.filter((e) => e.id !== emailToSnooze.id));
+                    setProcessedEmailIds((prev) => {
+                        const newSet = new Set(prev);
+                        newSet.delete(emailToSnooze.id);
+                        return newSet;
+                    });
+                },
+            }
+        );
+
+        setEmailToSnooze(null);
     };
 
     const handleUnhideEmail = (emailId: string) => {
@@ -955,6 +968,13 @@ const KanbanBoard = () => {
             <DragOverlay>
                 {activeEmail ? <StaticEmailCard email={activeEmail} /> : null}
             </DragOverlay>
+
+            <SnoozeDialog
+                open={showSnoozeDialog}
+                onOpenChange={setShowSnoozeDialog}
+                onConfirm={handleSnoozeConfirm}
+                emailSubject={emailToSnooze?.subject}
+            />
         </DndContext>
     );
 };

@@ -157,14 +157,14 @@ export function EmailDetail({ message, onBack, onReply, onReplyAll, onForward }:
 
     return (
         <div className="flex flex-col h-full">
-            <div className="pt-6 pb-4 px-8 shrink-0">
-                <div className="flex items-center gap-2">
+            <div className="pt-6 pb-4 px-4 sm:px-8 shrink-0">
+                <div className="flex items-center gap-2 flex-wrap">
                     {onBack && (
                         <Button variant="ghost" size="icon" className="lg:hidden" onClick={onBack}>
                             <ChevronLeft className="w-5 h-5" />
                         </Button>
                     )}
-                    <div className="flex gap-3 flex-wrap flex-1">
+                    <div className="flex gap-1 sm:gap-3 flex-wrap flex-1">
                         <Button
                             variant="ghost"
                             size="sm"
@@ -182,8 +182,8 @@ export function EmailDetail({ message, onBack, onReply, onReplyAll, onForward }:
                                 })
                             }
                         >
-                            <Reply className="w-4 h-4 mr-1 text-mail-foreground" />
-                            Reply
+                            <Reply className="w-4 h-4 sm:mr-1 text-mail-foreground" />
+                            <span className="hidden sm:inline">Reply</span>
                         </Button>
 
                         <Button
@@ -203,8 +203,8 @@ export function EmailDetail({ message, onBack, onReply, onReplyAll, onForward }:
                                 })
                             }
                         >
-                            <ReplyAll className="w-4 h-4 mr-1 text-mail-foreground" />
-                            Reply All
+                            <ReplyAll className="w-4 h-4 sm:mr-1 text-mail-foreground" />
+                            <span className="hidden sm:inline">Reply All</span>
                         </Button>
 
                         <Button
@@ -224,8 +224,8 @@ export function EmailDetail({ message, onBack, onReply, onReplyAll, onForward }:
                                 })
                             }
                         >
-                            <Forward className="w-4 h-4 mr-1 text-mail-foreground" />
-                            Forward
+                            <Forward className="w-4 h-4 sm:mr-1 text-mail-foreground" />
+                            <span className="hidden sm:inline">Forward</span>
                         </Button>
                         {!isDashboardView && (
                             <Button
@@ -240,8 +240,8 @@ export function EmailDetail({ message, onBack, onReply, onReplyAll, onForward }:
                                     )
                                 }
                             >
-                                <Link className="w-4 h-4 mr-1 text-mail-foreground" />
-                                To Gmail
+                                <Link className="w-4 h-4 sm:mr-1 text-mail-foreground" />
+                                <span className="hidden sm:inline">To Gmail</span>
                             </Button>
                         )}
                     </div>

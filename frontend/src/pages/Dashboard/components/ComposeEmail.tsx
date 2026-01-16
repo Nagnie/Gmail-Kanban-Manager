@@ -1,16 +1,17 @@
-import { Loader2, Paperclip, Send, X } from 'lucide-react';
-import { useState } from 'react';
+import { Loader2, Paperclip, Send, X } from "lucide-react";
+import { useState } from "react";
 
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
-    useReplyForwardEmailMutation, useSendEmailMutation
-} from '@/services/email/useEmailMutations';
+    useReplyForwardEmailMutation,
+    useSendEmailMutation,
+} from "@/services/email/useEmailMutations";
 
 interface ComposeEmailProps {
     onClose: () => void;
-    mode: 'compose' | 'reply' | 'reply_all' | 'forward' | null;
+    mode: "compose" | "reply" | "reply_all" | "forward" | null;
     replyTo?: {
         emailId: string;
         threadId: string;
@@ -21,15 +22,15 @@ interface ComposeEmailProps {
     };
 }
 export default function ComposeEmail({ onClose, mode, replyTo }: ComposeEmailProps) {
-    const [to, setTo] = useState(replyTo?.to || '');
-    const [cc, setCc] = useState('');
-    const [bcc, setBcc] = useState('');
-    const [subject, setSubject] = useState(replyTo?.subject || '');
-    const [body, setBody] = useState('');
+    const [to, setTo] = useState(replyTo?.to || "");
+    const [cc, setCc] = useState("");
+    const [bcc, setBcc] = useState("");
+    const [subject, setSubject] = useState(replyTo?.subject || "");
+    const [body, setBody] = useState("");
     const [files, setFiles] = useState<File[]>([]);
     const [showCc, setShowCc] = useState(false);
     const [showBcc, setShowBcc] = useState(false);
-    const [toError, setToError] = useState('');
+    const [toError, setToError] = useState("");
 
     const { mutate: sendEmail, isPending } = useSendEmailMutation();
     const { mutate: replyForwardEmail, isPending: isPendingReply } = useReplyForwardEmailMutation();
@@ -46,55 +47,63 @@ export default function ComposeEmail({ onClose, mode, replyTo }: ComposeEmailPro
         const trimmedBody = body.trim();
 
         if (!trimmedTo) {
-            setToError('Please enter at least one recipient.');
+            setToError("Please enter at least one recipient.");
             return;
         }
 
         if (!trimmedSubject || !trimmedBody) {
-            const ok = window.confirm('Are you sure? Subject or message is empty.');
+            const ok = window.confirm("Are you sure? Subject or message is empty.");
             if (!ok) return;
         }
 
         const formData = new FormData();
 
-        if (mode === 'compose') {
-            formData.append('to', JSON.stringify(to.split(',').map(email => email.trim())));
-            if (cc) formData.append('cc', JSON.stringify(cc.split(',').map(email => email.trim())));
-            if (bcc) formData.append('bcc', JSON.stringify(bcc.split(',').map(email => email.trim())));
-            formData.append('subject', subject);
-            formData.append('textBody', body);
+        if (mode === "compose") {
+            formData.append("to", JSON.stringify(to.split(",").map((email) => email.trim())));
+            if (cc)
+                formData.append("cc", JSON.stringify(cc.split(",").map((email) => email.trim())));
+            if (bcc)
+                formData.append("bcc", JSON.stringify(bcc.split(",").map((email) => email.trim())));
+            formData.append("subject", subject);
+            formData.append("textBody", body);
             // also include htmlBody for compose (convert newlines to <br>)
-            const composeHtml = body ? body.replace(/\n/g, '<br/>') : '';
-            if (composeHtml) formData.append('htmlBody', composeHtml);
-            if (replyTo?.threadId) formData.append('threadId', replyTo.threadId);
-            files.forEach((file) => formData.append('files', file));
+            const composeHtml = body ? body.replace(/\n/g, "<br/>") : "";
+            if (composeHtml) formData.append("htmlBody", composeHtml);
+            if (replyTo?.threadId) formData.append("threadId", replyTo.threadId);
+            files.forEach((file) => formData.append("files", file));
 
             sendEmail(formData, {
                 onSuccess: () => onClose(),
                 onError: (error) => console.error(error),
             });
         } else {
-            formData.append('type', mode!);
+            formData.append("type", mode!);
 
-            if (mode === 'forward') {
-                formData.append('to', JSON.stringify(to.split(',').map(email => email.trim())));
-                formData.append('subject', subject);
+            if (mode === "forward") {
+                formData.append("to", JSON.stringify(to.split(",").map((email) => email.trim())));
+                formData.append("subject", subject);
                 // formData.append('includeOriginalAttachments', includeOriginalAttachments.toString());
-            } else if (mode === 'reply_all') {
-                if (to) formData.append('to', JSON.stringify(to.split(',').map(email => email.trim())));
+            } else if (mode === "reply_all") {
+                if (to)
+                    formData.append(
+                        "to",
+                        JSON.stringify(to.split(",").map((email) => email.trim()))
+                    );
             }
 
-            if (cc) formData.append('cc', JSON.stringify(cc.split(',').map(email => email.trim())));
-            if (bcc) formData.append('bcc', JSON.stringify(bcc.split(',').map(email => email.trim())));
+            if (cc)
+                formData.append("cc", JSON.stringify(cc.split(",").map((email) => email.trim())));
+            if (bcc)
+                formData.append("bcc", JSON.stringify(bcc.split(",").map((email) => email.trim())));
             // Build HTML body: convert user's plain text to HTML and append original message (also convert original text to HTML)
-            const userHtml = trimmedBody ? trimmedBody.replace(/\n/g, '<br/>') : '';
-            const combinedHtml = userHtml ? `${userHtml}<br/><br/>` : '';
+            const userHtml = trimmedBody ? trimmedBody.replace(/\n/g, "<br/>") : "";
+            const combinedHtml = userHtml ? `${userHtml}<br/><br/>` : "";
 
             // For replies/forwards send htmlBody. Do not include subject for reply/reply_all (handled above: only forward keeps subject)
-            formData.append('htmlBody', combinedHtml || '');
+            formData.append("htmlBody", combinedHtml || "");
             console.log("🚀 ~ handleSend ~ htmlBody:", combinedHtml);
             console.log("🚀 ~ handleSend ~ formData:", [...formData.entries()]);
-            files.forEach((file) => formData.append('files', file));
+            files.forEach((file) => formData.append("files", file));
 
             replyForwardEmail(
                 { emailId: replyTo!.emailId, data: formData },
@@ -110,14 +119,8 @@ export default function ComposeEmail({ onClose, mode, replyTo }: ComposeEmailPro
         <div className="flex flex-col h-full">
             {/* Header */}
             <div className="flex items-center justify-between p-4 border-b">
-                <h3 className="font-semibold text-lg">
-                    {replyTo ? 'Reply' : 'New Message'}
-                </h3>
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={onClose}
-                    className='cursor-pointer'>
+                <h3 className="font-semibold text-lg">{replyTo ? "Reply" : "New Message"}</h3>
+                <Button variant="ghost" size="icon" onClick={onClose} className="cursor-pointer">
                     <X className="w-4 h-4" />
                 </Button>
             </div>
@@ -131,18 +134,18 @@ export default function ComposeEmail({ onClose, mode, replyTo }: ComposeEmailPro
                             value={to}
                             onChange={(e) => {
                                 setTo(e.target.value);
-                                if (toError) setToError('');
+                                if (toError) setToError("");
                             }}
                             placeholder="recipient@example.com"
                             className="flex-1"
-                            disabled={mode === 'reply'}
+                            disabled={mode === "reply"}
                         />
                         {!showCc && (
                             <Button
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => setShowCc(true)}
-                                className='cursor-pointer'
+                                className="cursor-pointer"
                             >
                                 Cc
                             </Button>
@@ -152,16 +155,14 @@ export default function ComposeEmail({ onClose, mode, replyTo }: ComposeEmailPro
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => setShowBcc(true)}
-                                className='cursor-pointer'
+                                className="cursor-pointer"
                             >
                                 Bcc
                             </Button>
                         )}
                     </div>
 
-                    {toError && (
-                        <p className="text-sm text-red-600">{toError}</p>
-                    )}
+                    {toError && <p className="text-sm text-red-600">{toError}</p>}
 
                     {showCc && (
                         <div className="flex items-center gap-2">
@@ -188,7 +189,7 @@ export default function ComposeEmail({ onClose, mode, replyTo }: ComposeEmailPro
                     )}
 
                     {/* Hide subject input for reply/reply_all (no subject sent) */}
-                    {mode !== 'reply' && mode !== 'reply_all' && (
+                    {mode !== "reply" && mode !== "reply_all" && (
                         <div className="flex items-center gap-2">
                             <span className="text-sm font-medium w-12">Subject:</span>
                             <Input
@@ -228,35 +229,31 @@ export default function ComposeEmail({ onClose, mode, replyTo }: ComposeEmailPro
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between p-4 border-t">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-4 border-t gap-2 sm:gap-0">
                 <div className="flex gap-2">
                     <Button
                         onClick={handleSend}
-                        disabled={mode === 'compose' ? isPending : isPendingReply}
-                        className="cursor-pointer"
+                        disabled={mode === "compose" ? isPending : isPendingReply}
+                        className="cursor-pointer flex-1 sm:flex-none"
                     >
                         {isPending ? (
                             <>
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                Sending...
+                                <Loader2 className="w-4 h-4 sm:mr-2 animate-spin" />
+                                <span className="hidden sm:inline">Sending...</span>
                             </>
                         ) : (
                             <>
-                                <Send className="w-4 h-4 mr-2" />
-                                Send
+                                <Send className="w-4 h-4 sm:mr-2" />
+                                <span className="hidden sm:inline">Send</span>
                             </>
                         )}
                     </Button>
 
-                    <label>
-                        <Button
-                            variant="outline"
-                            className="cursor-pointer"
-                            asChild
-                        >
+                    <label className="flex-1 sm:flex-none">
+                        <Button variant="outline" className="cursor-pointer w-full" asChild>
                             <span>
-                                <Paperclip className="w-4 h-4 mr-2" />
-                                Attach
+                                <Paperclip className="w-4 h-4 sm:mr-2" />
+                                <span className="hidden sm:inline">Attach</span>
                             </span>
                         </Button>
                         <input
@@ -271,8 +268,10 @@ export default function ComposeEmail({ onClose, mode, replyTo }: ComposeEmailPro
                 <Button
                     variant="ghost"
                     onClick={onClose}
-                    className='cursor-pointer'>
-                    Discard
+                    className="cursor-pointer w-full sm:w-auto"
+                >
+                    <span className="hidden sm:inline">Discard</span>
+                    <span className="sm:hidden">Cancel</span>
                 </Button>
             </div>
         </div>

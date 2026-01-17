@@ -13,7 +13,7 @@ export class EmailEmbeddingListener {
     private eventEmitter: EventEmitter2,
   ) {}
 
-  @OnEvent('email.embedding')
+  @OnEvent('email.embedding', { async: true })
   async handleGenerateEmbeddings(payload: EmailEmbeddingEvent) {
     const { userId, emailIds, batchNumber } = payload;
 

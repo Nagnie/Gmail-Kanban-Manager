@@ -8,13 +8,15 @@ import type {
     EmailSearchDto,
     EmailSearchResult,
     EmailSearchCard,
+    EmailSearchSuggestionParams,
+    EmailSearchSuggestionsResult,
 } from "./types";
 import type { EmailMessage } from "@/services/mailboxes/types";
 
 export const markEmailAsRead = async (emailId: string): Promise<EmailMessage> => {
     const client = apiClient.getClient();
     const response = await client.post<ApiResponse<EmailMessage>>(
-        `/api/v1/emails/${emailId}/mark-as-read`
+        `/api/v1/emails/${emailId}/mark-as-read`,
     );
     return response.data.data || ({} as EmailMessage);
 };
@@ -22,7 +24,7 @@ export const markEmailAsRead = async (emailId: string): Promise<EmailMessage> =>
 export const markEmailAsUnread = async (emailId: string): Promise<EmailMessage> => {
     const client = apiClient.getClient();
     const response = await client.post<ApiResponse<EmailMessage>>(
-        `/api/v1/emails/${emailId}/mark-as-unread`
+        `/api/v1/emails/${emailId}/mark-as-unread`,
     );
     return response.data.data || ({} as EmailMessage);
 };
@@ -36,7 +38,7 @@ export const starEmail = async (emailId: string): Promise<EmailMessage> => {
 export const unstarEmail = async (emailId: string): Promise<EmailMessage> => {
     const client = apiClient.getClient();
     const response = await client.post<ApiResponse<EmailMessage>>(
-        `/api/v1/emails/${emailId}/unstar`
+        `/api/v1/emails/${emailId}/unstar`,
     );
     return response.data.data || ({} as EmailMessage);
 };
@@ -44,41 +46,41 @@ export const unstarEmail = async (emailId: string): Promise<EmailMessage> => {
 export const deleteEmail = async (emailId: string): Promise<BatchOperationResponse> => {
     const client = apiClient.getClient();
     const response = await client.delete<ApiResponse<BatchOperationResponse>>(
-        `/api/v1/emails/${emailId}`
+        `/api/v1/emails/${emailId}`,
     );
     return response.data.data || { success: false };
 };
 
 export const batchDeleteEmails = async (
-    dto: DeleteBatchEmailDto
+    dto: DeleteBatchEmailDto,
 ): Promise<BatchOperationResponse> => {
     const client = apiClient.getClient();
     const response = await client.delete<ApiResponse<BatchOperationResponse>>(
         "/api/v1/emails/batch-delete",
-        { data: dto }
+        { data: dto },
     );
     return response.data.data || { success: false };
 };
 
 export const modifyEmail = async (
     emailId: string,
-    modifyDto: ModifyEmailDto
+    modifyDto: ModifyEmailDto,
 ): Promise<EmailMessage> => {
     const client = apiClient.getClient();
     const response = await client.post<ApiResponse<EmailMessage>>(
         `/api/v1/emails/${emailId}/modify`,
-        modifyDto
+        modifyDto,
     );
     return response.data.data || ({} as EmailMessage);
 };
 
 export const batchModifyEmails = async (
-    dto: BatchModifyEmailDto
+    dto: BatchModifyEmailDto,
 ): Promise<BatchOperationResponse> => {
     const client = apiClient.getClient();
     const response = await client.post<ApiResponse<BatchOperationResponse>>(
         "/api/v1/emails/batch-modify",
-        dto
+        dto,
     );
     return response.data.data || { success: false };
 };
@@ -86,7 +88,7 @@ export const batchModifyEmails = async (
 export const moveEmailToTrash = async (emailId: string): Promise<EmailMessage> => {
     const client = apiClient.getClient();
     const response = await client.post<ApiResponse<EmailMessage>>(
-        `/api/v1/emails/${emailId}/move-to-trash`
+        `/api/v1/emails/${emailId}/move-to-trash`,
     );
     return response.data.data || ({} as EmailMessage);
 };
@@ -94,7 +96,7 @@ export const moveEmailToTrash = async (emailId: string): Promise<EmailMessage> =
 export const moveEmailToInbox = async (emailId: string): Promise<EmailMessage> => {
     const client = apiClient.getClient();
     const response = await client.post<ApiResponse<EmailMessage>>(
-        `/api/v1/emails/${emailId}/move-to-inbox`
+        `/api/v1/emails/${emailId}/move-to-inbox`,
     );
     return response.data.data || ({} as EmailMessage);
 };
@@ -102,7 +104,7 @@ export const moveEmailToInbox = async (emailId: string): Promise<EmailMessage> =
 export const archiveEmail = async (emailId: string): Promise<EmailMessage> => {
     const client = apiClient.getClient();
     const response = await client.post<ApiResponse<EmailMessage>>(
-        `/api/v1/emails/${emailId}/archive`
+        `/api/v1/emails/${emailId}/archive`,
     );
     return response.data.data || ({} as EmailMessage);
 };
@@ -110,7 +112,7 @@ export const archiveEmail = async (emailId: string): Promise<EmailMessage> => {
 export const untrashEmail = async (emailId: string): Promise<EmailMessage> => {
     const client = apiClient.getClient();
     const response = await client.post<ApiResponse<EmailMessage>>(
-        `/api/v1/emails/${emailId}/untrash`
+        `/api/v1/emails/${emailId}/untrash`,
     );
     return response.data.data || ({} as EmailMessage);
 };
@@ -120,20 +122,20 @@ export const sendEmail = async (emailData: FormData): Promise<EmailMessage> => {
     const response = await client.post<ApiResponse<EmailMessage>>(
         `/api/v1/emails/send`,
         emailData,
-        { headers: { "Content-Type": "multipart/form-data" } }
+        { headers: { "Content-Type": "multipart/form-data" } },
     );
     return response.data.data || ({} as EmailMessage);
 };
 
 export const replyOrForwardEmail = async (
     emailId: string,
-    data: FormData
+    data: FormData,
 ): Promise<EmailMessage> => {
     const client = apiClient.getClient();
     const response = await client.post<ApiResponse<EmailMessage>>(
         `/api/v1/emails/${emailId}/reply`,
         data,
-        { headers: { "Content-Type": "multipart/form-data" } }
+        { headers: { "Content-Type": "multipart/form-data" } },
     );
     return response.data.data || ({} as EmailMessage);
 };
@@ -151,7 +153,7 @@ export const searchEmails = async (data: EmailSearchDto) => {
 
     const response = await client.post<ApiResponse<EmailSearchResult>>(
         `/api/v1/email/search/fuzzy`,
-        data
+        data,
     );
 
     return response.data.data || { data: [], page: 1, limit: 0, totalResult: 0 };
@@ -162,7 +164,7 @@ export const semanticSearchEmails = async (data: EmailSearchDto) => {
 
     const response = await client.post<ApiResponse<EmailSearchCard[]>>(
         `/api/v1/email/search/semantic`,
-        data
+        data,
     );
 
     const array = response.data.data || [];
@@ -176,4 +178,19 @@ export const semanticSearchEmails = async (data: EmailSearchDto) => {
     };
 
     // return response.data.data || { data: [], page: 1, limit: 0, totalResult: 0 };
+};
+
+export const searchSuggestions = async (
+    params: EmailSearchSuggestionParams,
+): Promise<EmailSearchSuggestionsResult | null> => {
+    const client = apiClient.getClient();
+
+    const response = await client.get<ApiResponse<EmailSearchSuggestionsResult>>(
+        `/api/v1/email/search/suggest`,
+        {
+            params,
+        },
+    );
+
+    return response.data.data;
 };

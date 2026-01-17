@@ -1,4 +1,3 @@
-import { Badge } from "@/components/ui/badge";
 import {
     Command,
     CommandEmpty,
@@ -6,23 +5,22 @@ import {
     CommandInput,
     CommandItem,
     CommandList,
-    CommandSeparator,
 } from "@/components/ui/command";
 import { useDebounce } from "@/hooks/useDebounce";
-import { useSemanticSearchEmails } from "@/hooks/useEmails";
 import { cn } from "@/lib/utils";
-import { Loader2, Mail, SearchIcon } from "lucide-react";
+import { Loader2, SearchIcon, User, Mail as MailIcon, TextSearch } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { searchSuggestions } from "@/services/email/api";
+import type { EmailSearchSuggestion } from "@/services/email/types";
 
 interface SemanticBarProps {
-    onEmailSelect: (emailId: string) => void;
     onViewAll: (query: string) => void;
     className?: string;
     initialQuery?: string;
 }
 
 export const SemanticSearchBar = ({
-    onEmailSelect,
     onViewAll,
     className,
     initialQuery = "",
@@ -40,13 +38,14 @@ export const SemanticSearchBar = ({
 
     const debouncedQuery = useDebounce(query, 300);
 
-    const { data: searchData, isLoading } = useSemanticSearchEmails(
-        debouncedQuery,
-        debouncedQuery.length >= 1 && open
-    );
-    console.log("🚀 ~ SemanticSearchBar ~ searchData:", searchData);
+    // Fetch suggestions instead of search results
+    const { data: suggestionsData, isLoading } = useQuery({
+        queryKey: ["search-suggestions", debouncedQuery],
+        queryFn: () => searchSuggestions({ query: debouncedQuery }),
+        enabled: debouncedQuery.length >= 1 && open,
+    });
 
-    const results = searchData?.data || [];
+    const suggestions = suggestionsData?.suggestions || [];
 
     useEffect(() => {
         if (!isInitialMount.current && query.length >= 1) {
@@ -92,6 +91,38 @@ export const SemanticSearchBar = ({
         }
     };
 
+    const handleSuggestionClick = (suggestionValue: string) => {
+        setQuery(suggestionValue);
+        onViewAll(suggestionValue);
+        setOpen(false);
+    };
+
+    const getSuggestionIcon = (type: EmailSearchSuggestion["type"]) => {
+        switch (type) {
+            case "sender":
+                return <User className="w-3 h-3 text-muted-foreground shrink-0" />;
+            case "subject":
+                return <MailIcon className="w-3 h-3 text-muted-foreground shrink-0" />;
+            case "query":
+                return <TextSearch className="w-3 h-3 text-muted-foreground shrink-0" />;
+            default:
+                return <SearchIcon className="w-3 h-3 text-muted-foreground shrink-0" />;
+        }
+    };
+
+    const getSuggestionLabel = (type: EmailSearchSuggestion["type"]) => {
+        switch (type) {
+            case "sender":
+                return "From";
+            case "subject":
+                return "Subject";
+            case "query":
+                return "Query";
+            default:
+                return "";
+        }
+    };
+
     const handleInputChange = (value: string) => {
         setQuery(value);
         if (isInitialMount.current) {
@@ -129,80 +160,66 @@ export const SemanticSearchBar = ({
                         {isLoading && (
                             <div className="p-8 flex flex-col items-center justify-center">
                                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground mb-2" />
-                                <p className="text-sm text-muted-foreground">Searching...</p>
+                                <p className="text-sm text-muted-foreground">
+                                    Loading suggestions...
+                                </p>
                             </div>
                         )}
 
-                        {!isLoading && results.length === 0 && (
+                        {!isLoading && suggestions.length === 0 && (
                             <CommandEmpty>
                                 <div className="flex flex-col items-center py-6">
-                                    <Mail className="w-8 h-8 text-muted-foreground mb-2 opacity-50" />
-                                    <p className="text-sm font-medium">No emails found</p>
+                                    <SearchIcon className="w-8 h-8 text-muted-foreground mb-2 opacity-50" />
+                                    <p className="text-sm font-medium">No suggestions found</p>
                                     <p className="text-xs text-muted-foreground">
-                                        Try different keywords
+                                        Press Enter to search
                                     </p>
                                 </div>
                             </CommandEmpty>
                         )}
 
-                        {!isLoading && results.length > 0 && (
+                        {!isLoading && suggestions.length > 0 && (
                             <>
-                                <CommandGroup heading="Search Results">
-                                    {results.map((email) => (
-                                        <CommandItem
-                                            key={email.id}
-                                            value={email.id}
-                                            onSelect={() => {
-                                                onEmailSelect(email.id);
-                                                setOpen(false);
-                                            }}
-                                            className="cursor-pointer"
-                                        >
-                                            <div className="flex flex-col gap-1 flex-1 min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                    <Mail className="w-3 h-3 text-muted-foreground shrink-0" />
-                                                    <span className="text-sm font-medium truncate">
-                                                        {email.sender}
-                                                    </span>
-                                                    {!email.isRead && (
-                                                        <Badge
-                                                            variant="secondary"
-                                                            className="h-4 text-xs"
-                                                        >
-                                                            New
-                                                        </Badge>
-                                                    )}
+                                <CommandGroup heading="Search Suggestions">
+                                    {suggestions.map(
+                                        (suggestion: EmailSearchSuggestion, index: number) => (
+                                            <CommandItem
+                                                key={`${suggestion.type}-${suggestion.value}-${index}`}
+                                                value={suggestion.value}
+                                                onSelect={() =>
+                                                    handleSuggestionClick(suggestion.value)
+                                                }
+                                                className="cursor-pointer"
+                                            >
+                                                <div className="flex items-center gap-2 flex-1 min-w-0">
+                                                    {getSuggestionIcon(suggestion.type)}
+                                                    <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-xs text-muted-foreground uppercase font-medium">
+                                                                {getSuggestionLabel(
+                                                                    suggestion.type,
+                                                                )}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-sm truncate">
+                                                            {suggestion.value}
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                <p className="text-sm font-semibold truncate pl-5">
-                                                    {email.subject}
-                                                </p>
-                                                <p className="text-xs text-muted-foreground line-clamp-1 pl-5">
-                                                    {email.snippet}
-                                                </p>
-                                            </div>
-                                            <div className="text-xs text-muted-foreground ml-2 shrink-0">
-                                                {new Date(
-                                                    +email.internalDate || +email.internal_date
-                                                ).toLocaleDateString("en-US", {
-                                                    month: "short",
-                                                    day: "numeric",
-                                                })}
-                                            </div>
-                                        </CommandItem>
-                                    ))}
+                                            </CommandItem>
+                                        ),
+                                    )}
                                 </CommandGroup>
-
-                                <CommandSeparator />
 
                                 <CommandItem
                                     onSelect={() => {
                                         onViewAll(query);
                                         setOpen(false);
                                     }}
-                                    className="cursor-pointer justify-center text-primary"
+                                    className="cursor-pointer justify-center text-primary border-t"
                                 >
                                     <SearchIcon className="w-4 h-4 mr-2" />
-                                    View all results for "{query}"
+                                    Search for "{query}"
                                 </CommandItem>
                             </>
                         )}

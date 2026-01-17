@@ -114,7 +114,7 @@ export default function Dashboard() {
 
     const { threadDetail, isLoading: isLoadingThread } = useThreadDetail(
         selectedEmail?.threadId || "",
-        !!selectedEmail
+        !!selectedEmail,
     );
 
     useEffect(() => {
@@ -138,7 +138,7 @@ export default function Dashboard() {
                         !mailbox.id.startsWith("CATEGORY_") &&
                         !mailbox.id.startsWith("YELLOW_") &&
                         !mailbox.id.startsWith("CHAT") &&
-                        !mailbox.id.startsWith("DRAFT")
+                        !mailbox.id.startsWith("DRAFT"),
                 )
                 .map((mailbox) => ({
                     id: mailbox.id,
@@ -165,7 +165,7 @@ export default function Dashboard() {
         navigate(
             `/search?q=${encodeURIComponent(query)}${
                 searchMode === "semantic" ? "&mode=semantic" : ""
-            }`
+            }`,
         );
     };
 
@@ -294,7 +294,7 @@ export default function Dashboard() {
                                                     window.history.replaceState(
                                                         {},
                                                         "",
-                                                        `?folder=${encodeURIComponent(folder.id)}`
+                                                        `?folder=${encodeURIComponent(folder.id)}`,
                                                     );
                                                     setShowMobileFolders(false);
                                                     // Clear folder search when switching folders
@@ -389,7 +389,6 @@ export default function Dashboard() {
                             />
                         ) : searchMode === "semantic" ? (
                             <SemanticSearchBar
-                                onEmailSelect={handleEmailSelectFromFuzzy}
                                 onViewAll={handleViewAllFuzzyResults}
                                 className="max-w-full"
                             />
@@ -554,7 +553,7 @@ export default function Dashboard() {
                                                             e.stopPropagation();
                                                             window.open(
                                                                 `https://mail.google.com/mail/u/0/#all/${email.id}`,
-                                                                "_blank"
+                                                                "_blank",
                                                             );
                                                         }}
                                                         className="cursor-pointer p-0 mt-1 text-sm text-blue-600"

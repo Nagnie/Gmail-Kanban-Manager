@@ -72,7 +72,7 @@ export default function SearchResultsPage() {
                         !mailbox.id.startsWith("CATEGORY_") &&
                         !mailbox.id.startsWith("YELLOW_") &&
                         !mailbox.id.startsWith("CHAT") &&
-                        !mailbox.id.startsWith("DRAFT")
+                        !mailbox.id.startsWith("DRAFT"),
                 )
                 .map((mailbox) => ({
                     id: mailbox.id,
@@ -89,7 +89,7 @@ export default function SearchResultsPage() {
         navigate(
             `/email/${emailId}?from=search&q=${encodeURIComponent(queryFromUrl)}${
                 isSemanticMode ? "&mode=semantic" : ""
-            }`
+            }`,
         );
     };
 
@@ -107,7 +107,7 @@ export default function SearchResultsPage() {
         navigate(
             `/email/${email.id}?from=search&q=${encodeURIComponent(queryFromUrl)}${
                 isSemanticMode ? "&mode=semantic" : ""
-            }`
+            }`,
         );
     };
 
@@ -202,7 +202,6 @@ export default function SearchResultsPage() {
                     {/* Search Bar - dynamically render based on mode */}
                     {isSemanticMode ? (
                         <SemanticSearchBar
-                            onEmailSelect={handleEmailSelectFromDropdown}
                             onViewAll={handleViewAllFromSearch}
                             initialQuery={queryFromUrl}
                         />
@@ -287,7 +286,7 @@ export default function SearchResultsPage() {
                                                             className="h-5 text-xs"
                                                         >
                                                             {Math.round(
-                                                                email.relevance_score * 100
+                                                                email.relevance_score * 100,
                                                             )}
                                                             % match
                                                         </Badge>
@@ -315,7 +314,7 @@ export default function SearchResultsPage() {
                                             )}
                                             <p className="text-xs text-muted-foreground mt-2">
                                                 {new Date(
-                                                    +email.internalDate || +email.internal_date
+                                                    +email.internalDate || +email.internal_date,
                                                 ).toLocaleString()}
                                             </p>
                                         </div>

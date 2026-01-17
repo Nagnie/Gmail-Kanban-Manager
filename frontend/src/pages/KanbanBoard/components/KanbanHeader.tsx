@@ -38,7 +38,7 @@ export const KanbanHeader = ({
 
     const handleEmailSelect = (emailId: string) => {
         navigate(
-            `/email/${emailId}?from=kanban${searchMode === "semantic" ? "&mode=semantic" : ""}`
+            `/email/${emailId}?from=kanban${searchMode === "semantic" ? "&mode=semantic" : ""}`,
         );
     };
 
@@ -46,7 +46,7 @@ export const KanbanHeader = ({
         navigate(
             `/search?q=${encodeURIComponent(query)}&from=kanban${
                 searchMode === "semantic" ? "&mode=semantic" : ""
-            }`
+            }`,
         );
     };
 
@@ -61,10 +61,7 @@ export const KanbanHeader = ({
                             onViewAll={handleViewAllSearch}
                         />
                     ) : (
-                        <SemanticSearchBar
-                            onEmailSelect={handleEmailSelect}
-                            onViewAll={handleViewAllSearch}
-                        />
+                        <SemanticSearchBar onViewAll={handleViewAllSearch} />
                     )}
                     <div className="flex gap-2">
                         <Button
@@ -155,10 +152,7 @@ export const KanbanHeader = ({
                                 onViewAll={handleViewAllSearch}
                             />
                         ) : (
-                            <SemanticSearchBar
-                                onEmailSelect={handleEmailSelect}
-                                onViewAll={handleViewAllSearch}
-                            />
+                            <SemanticSearchBar onViewAll={handleViewAllSearch} />
                         )}
                     </div>
                     {isFetchingEmails && (

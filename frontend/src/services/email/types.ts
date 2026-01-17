@@ -44,3 +44,20 @@ export interface EmailSearchResult {
     limit: number;
     totalResult: number;
 }
+
+export interface EmailSearchSuggestionParams {
+    query: string;
+}
+
+export type SuggestionType = "sender" | "subject" | "query";
+
+export interface EmailSearchSuggestion {
+    type: SuggestionType;
+    value: string;
+    score: number;
+}
+
+export interface EmailSearchSuggestionsResult {
+    query: string;
+    suggestions: EmailSearchSuggestion[];
+}

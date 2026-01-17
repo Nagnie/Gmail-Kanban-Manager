@@ -28,4 +28,7 @@ export type {
     BatchModifyEmailDto,
     ModifyEmailDto,
     BatchOperationResponse,
+    EmailSearchSuggestion,
+    EmailSearchSuggestionParams,
+    EmailSearchSuggestionsResult,
 } from "./types";

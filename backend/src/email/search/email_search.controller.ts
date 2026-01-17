@@ -1,9 +1,11 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -38,5 +40,24 @@ export class EmailSearchController {
       searchDto.query,
       searchDto.limit,
     );
+  }
+
+  @Get('search/suggest')
+  @HttpCode(HttpStatus.OK)
+  @ApiSecurity('jwt')
+  async suggestQueries(@Req() req, @Query('query') query: string) {
+    if (!query || query.trim().length < 2) {
+      return { query: query, suggestions: [] };
+    }
+
+    const userId = req.user.sub;
+
+    return {
+      query: query,
+      suggestions: await this.emailSearchService.suggestQueries(
+        userId,
+        query.trim(),
+      ),
+    };
   }
 }

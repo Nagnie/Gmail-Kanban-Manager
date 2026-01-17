@@ -85,30 +85,20 @@ export class EmailSynceService {
     });
 
     const messages = listRes.data.messages || [];
-    if (messages.length === 0) return [];
     const nextPageToken = listRes.data.nextPageToken;
 
-    const emailIds = await this.processAndSaveBatch(userId, messages, gmail);
-
-    // Trigger background embedding generation
-    if (emailIds.length > 0) {
+    // Emit event ngay để xử lý tất cả trong background
+    if (messages.length > 0) {
       console.log(
-        `Triggering background embedding generation for ${emailIds.length} emails...`,
+        `Triggering background sync for ${messages.length} emails...`,
       );
-      this.eventEmitter.emit(
-        'email.embedding',
-        new EmailEmbeddingEvent(userId, emailIds, 1),
-      );
-    }
-
-    if (nextPageToken) {
-      console.log('Triggering background sync...');
       this.eventEmitter.emit(
         'email.sync',
-        new EmailSyncEvent(userId, nextPageToken, 1),
+        new EmailSyncEvent(userId, nextPageToken!, 0), // pageCount = 0 để xử lý first batch
       );
     }
 
+    // Return ngay emails hiện có trong DB
     return this.emailRepository.find({
       where: { userId },
       order: { internalDate: 'DESC' },
@@ -126,6 +116,43 @@ export class EmailSynceService {
         From: ${email.sender}
         Content: ${email.summary || email.snippet || ''}
     `.trim();
+  }
+
+  async syncFirstBatch(userId: number): Promise<void> {
+    const gmail = await this.gmailService.getAuthenticatedGmailClient(userId);
+
+    const listRes = await gmail.users.messages.list({
+      userId: 'me',
+      maxResults: 100,
+    });
+
+    const messages = listRes.data.messages || [];
+    if (messages.length === 0) return;
+
+    const nextPageToken = listRes.data.nextPageToken;
+
+    // Process và save batch
+    const emailIds = await this.processAndSaveBatch(userId, messages, gmail);
+
+    // Trigger embedding generation
+    if (emailIds.length > 0) {
+      console.log(
+        `Triggering background embedding generation for ${emailIds.length} emails...`,
+      );
+      this.eventEmitter.emit(
+        'email.embedding',
+        new EmailEmbeddingEvent(userId, emailIds, 1),
+      );
+    }
+
+    // Trigger sync pages tiếp theo
+    if (nextPageToken) {
+      console.log('Triggering next page sync...');
+      this.eventEmitter.emit(
+        'email.sync',
+        new EmailSyncEvent(userId, nextPageToken, 1),
+      );
+    }
   }
 
   async generateEmbeddingsForEmails(

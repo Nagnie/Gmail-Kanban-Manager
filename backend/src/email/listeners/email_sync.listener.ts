@@ -16,10 +16,22 @@ export class EmailSyncListener {
     private eventEmitter: EventEmitter2,
   ) {}
 
-  @OnEvent('email.sync')
+  @OnEvent('email.sync', { async: true })
   async handleSyncOldEmails(payload: EmailSyncEvent) {
     const { userId, pageToken, pageCount } = payload;
 
+    // pageCount = 0 là first batch
+    if (pageCount === 0) {
+      try {
+        this.logger.debug(`Starting background sync for User ${userId}...`);
+        await this.emailSyncService.syncFirstBatch(userId);
+      } catch (error) {
+        this.logger.error(`Error starting sync for user ${userId}`, error);
+      }
+      return;
+    }
+
+    // Xử lý các pages tiếp theo
     if (!pageToken || pageCount > this.MAX_PAGES) {
       this.logger.log(
         `Background sync job finished for User ${userId}. Pages: ${pageCount}`,

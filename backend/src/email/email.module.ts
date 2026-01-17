@@ -10,9 +10,10 @@ import { EmailSyncController } from './sync/email_sync.controller';
 import { EmailSearchService } from './search/email_search.service';
 import { EmailSearchController } from './search/email_search.controller';
 import { EmailEmbeddingListener } from './listeners/email_embedding.listener';
+import { SearchHistory } from './entities/email.search-history.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Email]), GmailModule],
+  imports: [TypeOrmModule.forFeature([Email, SearchHistory]), GmailModule],
   controllers: [EmailController, EmailSyncController, EmailSearchController],
   providers: [
     EmailService,

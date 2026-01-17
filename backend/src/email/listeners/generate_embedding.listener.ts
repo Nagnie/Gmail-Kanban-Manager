@@ -16,7 +16,7 @@ export class GenerateEmbeddingListener {
     private openRouterService: OpenRouterService,
   ) {}
 
-  @OnEvent('emails.embeddings.generate')
+  @OnEvent('emails.embeddings.generate', { async: true })
   async handleGenerateEmbeddings(payload: GenerateEmbeddingsEvent) {
     const { emailIds } = payload;
     this.logger.log(

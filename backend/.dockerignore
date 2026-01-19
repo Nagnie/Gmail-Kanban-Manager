@@ -1,0 +1,39 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+yarn-debug.log
+
+# Build output
+dist
+artifacts
+coverage
+
+# Environments
+.env
+.env.*
+!.env.example
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Editor / IDE
+.vscode
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Formatting / Linting
+.prettierrc
+.eslintrc.js
+*.md

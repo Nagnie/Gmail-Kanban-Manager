@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
     Reply,
     ReplyAll,
@@ -10,10 +10,18 @@ import {
     Trash,
     FileText,
     Link,
+    Eye,
+    Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { formatDateLong, formatFileSize } from "@/lib/utils";
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 import type { ThreadMessage } from "@/services/mailboxes/types";
 import DOMPurify from "dompurify";
 import {
@@ -23,6 +31,7 @@ import {
     useMarkAsUnreadMutation,
     useDeleteEmailMutation,
     useDownloadAttachmentMutation,
+    useFetchAttachmentMutation,
 } from "@/services/tanstack-query";
 import { useLocation } from "react-router-dom";
 
@@ -65,6 +74,15 @@ export function EmailDetail({ message, onBack, onReply, onReplyAll, onForward }:
     const pathname = useLocation().pathname;
     const isDashboardView = pathname.startsWith("/dashboard");
 
+    // Preview state
+    const [previewAttachment, setPreviewAttachment] = useState<{
+        filename: string;
+        mimeType: string;
+        attachmentId: string;
+        size: number;
+    } | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string>("");
+
     // Email action mutations
     const { mutate: starEmail } = useStarEmailMutation();
     const { mutate: unstarEmail } = useUnstarEmailMutation();
@@ -73,6 +91,8 @@ export function EmailDetail({ message, onBack, onReply, onReplyAll, onForward }:
     const { mutate: deleteEmail } = useDeleteEmailMutation();
     const { mutate: downloadAttachment, isPending: isDownloading } =
         useDownloadAttachmentMutation();
+    const { mutate: fetchAttachment, isPending: isFetchingPreview } =
+        useFetchAttachmentMutation();
 
     // Auto mark as read when email is opened if it's unread
     useEffect(() => {
@@ -153,6 +173,113 @@ export function EmailDetail({ message, onBack, onReply, onReplyAll, onForward }:
             filename,
             mimeType,
         });
+    };
+
+    const handlePreviewAttachment = (
+        attachmentId: string,
+        filename: string,
+        mimeType: string,
+        size: number
+    ) => {
+        if (!message) return;
+
+        // Check if file type is previewable
+        const isImage = mimeType.startsWith("image/");
+        const isPdf = mimeType === "application/pdf";
+        const isText =
+            mimeType.startsWith("text/") ||
+            mimeType === "application/json" ||
+            mimeType === "application/xml";
+
+        if (!isImage && !isPdf && !isText) {
+            alert("Loại file này không hỗ trợ xem trước. Vui lòng tải xuống để xem.");
+            return;
+        }
+
+        setPreviewAttachment({ filename, mimeType, attachmentId, size });
+
+        // Use the fetch attachment mutation to get the blob
+        fetchAttachment(
+            {
+                attachmentId,
+                messageId: message.id,
+                filename,
+                mimeType,
+            },
+            {
+                onSuccess: (data) => {
+                    const url = URL.createObjectURL(data.buffer);
+                    setPreviewUrl(url);
+                },
+                onError: (error) => {
+                    console.error("Error previewing attachment:", error);
+                    alert("Không thể xem trước file này");
+                    setPreviewAttachment(null);
+                },
+            }
+        );
+    };
+
+    const closePreview = () => {
+        if (previewUrl) {
+            URL.revokeObjectURL(previewUrl);
+        }
+        setPreviewUrl("");
+        setPreviewAttachment(null);
+    };
+
+    const renderPreviewContent = () => {
+        if (!previewAttachment) return null;
+
+        // Show loading state while fetching
+        if (isFetchingPreview || !previewUrl) {
+            return (
+                <div className="flex items-center justify-center h-[70vh]">
+                    <div className="text-center space-y-3">
+                        <Loader2 className="w-12 h-12 mx-auto animate-spin text-primary" />
+                        <p className="text-muted-foreground">Loading preview...</p>
+                    </div>
+                </div>
+            );
+        }
+
+        const { mimeType, filename } = previewAttachment;
+
+        if (mimeType.startsWith("image/")) {
+            return (
+                <img
+                    src={previewUrl}
+                    alt={filename}
+                    className="max-w-full max-h-[70vh] object-contain mx-auto"
+                />
+            );
+        }
+
+        if (mimeType === "application/pdf") {
+            return (
+                <iframe
+                    src={previewUrl}
+                    className="w-full h-[70vh] border-0"
+                    title={filename}
+                />
+            );
+        }
+
+        if (
+            mimeType.startsWith("text/") ||
+            mimeType === "application/json" ||
+            mimeType === "application/xml"
+        ) {
+            return (
+                <iframe
+                    src={previewUrl}
+                    className="w-full h-[70vh] border-0 bg-white"
+                    title={filename}
+                />
+            );
+        }
+
+        return null;
     };
 
     return (
@@ -331,21 +458,43 @@ export function EmailDetail({ message, onBack, onReply, onReplyAll, onForward }:
                                                     </div>
                                                 </div>
                                             </div>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="cursor-pointer"
-                                                onClick={() =>
-                                                    handleDownloadAttachment(
-                                                        attachment.attachmentId,
-                                                        attachment.filename,
-                                                        attachment.mimeType
-                                                    )
-                                                }
-                                                disabled={isDownloading}
-                                            >
-                                                <Download className="w-4 h-4" />
-                                            </Button>
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="cursor-pointer"
+                                                    onClick={() =>
+                                                        handlePreviewAttachment(
+                                                            attachment.attachmentId,
+                                                            attachment.filename,
+                                                            attachment.mimeType,
+                                                            attachment.size
+                                                        )
+                                                    }
+                                                    disabled={isFetchingPreview}
+                                                >
+                                                    {isFetchingPreview ? (
+                                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                                    ) : (
+                                                        <Eye className="w-4 h-4" />
+                                                    )}
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="cursor-pointer"
+                                                    onClick={() =>
+                                                        handleDownloadAttachment(
+                                                            attachment.attachmentId,
+                                                            attachment.filename,
+                                                            attachment.mimeType
+                                                        )
+                                                    }
+                                                    disabled={isDownloading}
+                                                >
+                                                    <Download className="w-4 h-4" />
+                                                </Button>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -353,6 +502,18 @@ export function EmailDetail({ message, onBack, onReply, onReplyAll, onForward }:
                         )}
                 </div>
             </ScrollArea>
+
+            {/* Preview Dialog */}
+            <Dialog open={!!previewAttachment} onOpenChange={closePreview}>
+                <DialogContent className="min-w-4xl max-h-[90vh] overflow-hidden">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center justify-between">
+                            <span className="truncate">{previewAttachment?.filename}</span>
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="overflow-auto">{renderPreviewContent()}</div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

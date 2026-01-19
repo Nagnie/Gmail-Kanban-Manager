@@ -25,3 +25,16 @@ export const useDownloadAttachmentMutation = () => {
         },
     });
 };
+
+/**
+ * Mutation: Fetch attachment for preview
+ * Returns the blob data without triggering download
+ */
+export const useFetchAttachmentMutation = () => {
+    return useMutation({
+        mutationFn: (params: AttachmentDownloadParams) => downloadAttachment(params),
+        onError: (error) => {
+            console.error("Failed to fetch attachment:", error);
+        },
+    });
+};

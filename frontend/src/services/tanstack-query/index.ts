@@ -20,5 +20,5 @@ export {
 } from "@/services/email/useEmailMutations";
 export { emailKeys } from "@/services/email/queryKeys";
 
-export { useDownloadAttachmentMutation } from "@/services/attachment/useAttachmentQueries";
+export { useDownloadAttachmentMutation, useFetchAttachmentMutation } from "@/services/attachment/useAttachmentQueries";
 export { attachmentKeys } from "@/services/attachment/queryKeys";

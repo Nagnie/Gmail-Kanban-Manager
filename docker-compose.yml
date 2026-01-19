@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:8.4-alpine
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
+    command: redis-server --save 20 1 --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    volumes:
+      - ./data/cache:/data
+    networks:
+      - gmail_kanban_manager
+
+
+  backend:
+      depends_on:
+        redis:
+          condition: service_healthy
+      container_name: backend
+      build:
+        context: ./backend/
+        dockerfile: Dockerfile
+      ports:
+        - "3001:3001"
+      restart: unless-stopped
+      env_file:
+        - ./backend/.env
+      networks:
+        - gmail_kanban_manager
+      
+  frontend:
+    container_name: frontend
+    build:
+      context: ./frontend/
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
+        VITE_API_URL: ${VITE_API_URL}
+      dockerfile: Dockerfile
+    ports:
+      - 80:80
+    restart: unless-stopped
+    volumes:
+      - ./conf/nginx/conf/:/etc/nginx/conf.d:ro
+    networks:
+      - gmail_kanban_manager
+
+networks:
+  gmail_kanban_manager:
+    driver: bridge

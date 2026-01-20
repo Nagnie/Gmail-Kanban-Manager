@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { SnoozeService } from './snooze.service';
 import { GmailModule } from '../gmail/gmail.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -13,7 +13,7 @@ import { WebSocketConnectionManager } from 'src/snooze/websocket-connection.mana
 
 @Module({
   imports: [
-    GmailModule,
+    forwardRef(() => GmailModule),
     TypeOrmModule.forFeature([
       EmailSnooze,
       EmailKanbanOrder,

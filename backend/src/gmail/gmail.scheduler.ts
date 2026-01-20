@@ -1,0 +1,116 @@
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from 'src/user/entities/user.entity';
+import { GmailService } from './gmail.service';
+import { WebSocketConnectionManager } from 'src/snooze/websocket-connection.manager';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import { SnoozeGateway } from 'src/snooze/snooze.gateway';
+import { EmailSyncEvent } from 'src/email/events/email_sync.event';
+
+@Injectable()
+export class GmailScheduler implements OnModuleInit, OnModuleDestroy {
+  private readonly logger = new Logger(GmailScheduler.name);
+  private timer: NodeJS.Timeout | null = null;
+
+  constructor(
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
+    private readonly gmailService: GmailService,
+    private readonly eventEmitter: EventEmitter2,
+    private readonly connectionManager: WebSocketConnectionManager,
+    private readonly snoozeGateway: SnoozeGateway,
+    private readonly configService: ConfigService,
+  ) {}
+
+  onModuleInit() {
+    const enabled = this.configService.get<string>('GMAIL_POLL_ENABLED');
+    if (enabled === 'false') {
+      this.logger.log('Gmail poller disabled by config');
+      return;
+    }
+
+    const intervalSec = parseInt(
+      this.configService.get<string>('GMAIL_POLL_INTERVAL_SECONDS') || '60',
+      10,
+    );
+
+    const intervalMs = Math.max(1000, intervalSec * 1000);
+
+    this.logger.log(`Starting Gmail poller (interval ${intervalSec}s)`);
+
+    this.timer = setInterval(() => {
+      void this.pollForNewEmails().catch((err) =>
+        this.logger.error(`Gmail poller error: ${err.message || err}`),
+      );
+    }, intervalMs);
+  }
+
+  onModuleDestroy() {
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
+    this.logger.log('Gmail poller stopped');
+  }
+
+  // Poll method (invoked by timer)
+  async pollForNewEmails() {
+    this.logger.debug('Polling for new Gmail messages...');
+
+    try {
+      const users = await this.userRepository
+        .createQueryBuilder('user')
+        .where('user.google_refresh_token IS NOT NULL')
+        .getMany();
+
+      for (const user of users) {
+        try {
+          const isOnline = await this.connectionManager.isConnectedGlobally(
+            user.id.toString(),
+          );
+
+          if (!isOnline) continue;
+
+          const gmailClient =
+            await this.gmailService.getAuthenticatedGmailClient(user.id);
+
+          const query = this.configService.get<string>('GMAIL_QUERY') || '';
+
+          const listRes = await gmailClient.users.messages.list({
+            userId: 'me',
+            maxResults: 100,
+            q: query || undefined,
+          });
+
+          const messages = listRes.data.messages || [];
+          if (messages.length === 0) continue;
+
+          // Trigger background sync via event emitter. The Email module
+          // listens to 'email.sync' events and will process pages in background.
+          this.eventEmitter.emit(
+            'email.sync',
+            new EmailSyncEvent(
+              user.id,
+              listRes.data.nextPageToken ?? undefined,
+              0,
+            ),
+          );
+
+          // Notify frontend that there are new messages; frontend can fetch details.
+          this.snoozeGateway.notifyNewEmails(user.id.toString(), []);
+        } catch (e) {
+          this.logger.warn(`Polling failed for user ${user.id}: ${e.message}`);
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Gmail poller error: ${error.message}`);
+    }
+  }
+}

@@ -1,4 +1,5 @@
 import { EyeOff, Grip, Loader2, Sparkles, Star } from "lucide-react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { formatDateShort } from "@/lib/utils";
@@ -19,6 +20,7 @@ export const DraggableEmailCard = ({
     isSummarizing?: boolean;
     source: string | "inbox";
 }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
     const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
         id: `${source}-${email.id}`,
         data: { email, source },
@@ -86,9 +88,17 @@ export const DraggableEmailCard = ({
                         AI
                     </div>
                     {email.summary ? (
-                        <p className="text-xs text-foreground leading-relaxed line-clamp-3">
-                            {email.summary}
-                        </p>
+                        <div className="flex-1">
+                            <p className={`text-xs text-foreground leading-relaxed ${isExpanded ? '' : 'line-clamp-3'}`}>
+                                {email.summary}
+                            </p>
+                            <button
+                                onClick={() => setIsExpanded(!isExpanded)}
+                                className="text-xs cursor-pointer text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium mt-1"
+                            >
+                                {isExpanded ? 'Show Less' : 'See More'}
+                            </button>
+                        </div>
                     ) : (
                         <div className="flex-1 flex items-center justify-between">
                             <p className="text-xs text-muted-foreground leading-relaxed line-clamp-1 italic">

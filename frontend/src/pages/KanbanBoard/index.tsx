@@ -138,6 +138,15 @@ const KanbanBoard = () => {
             // Refresh only the affected column
             // refreshColumn(event.columnId);
             queryClient.invalidateQueries({ queryKey: kanbanKeys.column(+event.columnId) });
+
+            if (event.columnId === localStorage.getItem("inboxColumnId")) {
+                queryClient.invalidateQueries({
+                    queryKey: kanbanKeys.column(+event.columnId, {
+                        search: searchQuery,
+                    }),
+                });
+            }
+
             queryClient.invalidateQueries({ queryKey: kanbanKeys.snoozed() });
         },
         onConnected: () => {
@@ -213,7 +222,7 @@ const KanbanBoard = () => {
             activationConstraint: {
                 distance: 8,
             },
-        })
+        }),
     );
 
     // Use infinite scroll for inbox column
@@ -240,13 +249,17 @@ const KanbanBoard = () => {
             const sortedCols = cols.sort((a: any, b: any) => a.order - b.order);
 
             const inbox = sortedCols.find(
-                (col: any) => col.labelIds?.includes("INBOX") || col.name.toLowerCase() === "inbox"
+                (col: any) => col.labelIds?.includes("INBOX") || col.name.toLowerCase() === "inbox",
             );
             const kanban = sortedCols.filter(
-                (col: any) => !col.labelIds?.includes("INBOX") && col.name.toLowerCase() !== "inbox"
+                (col: any) =>
+                    !col.labelIds?.includes("INBOX") && col.name.toLowerCase() !== "inbox",
             );
 
             setInboxColumn(inbox);
+
+            localStorage.setItem("inboxColumnId", inbox?.id?.toString() || "");
+
             setKanbanColumns(kanban);
 
             // Initialize settings
@@ -295,7 +308,7 @@ const KanbanBoard = () => {
                         hasSummary: !!s.summary,
                         headers: s.headers || header,
                     } as any;
-                })
+                }),
             );
         }
     }, [snoozedData]);
@@ -308,7 +321,7 @@ const KanbanBoard = () => {
 
     const updateColumnSettings = (
         columnId: string,
-        updater: (prev: ColumnSettings) => ColumnSettings
+        updater: (prev: ColumnSettings) => ColumnSettings,
     ) => {
         setColumnSettings((prev) => ({
             ...prev,
@@ -318,7 +331,7 @@ const KanbanBoard = () => {
                     filterUnread: false,
                     filterAttachments: false,
                     search: "",
-                }
+                },
             ),
         }));
     };
@@ -339,7 +352,7 @@ const KanbanBoard = () => {
 
     const filteredInboxEmails = useMemo(
         () => applyFiltersAndSort(inboxEmails, inboxSettings),
-        [inboxEmails, inboxSettings]
+        [inboxEmails, inboxSettings],
     );
 
     const handleSummarizeEmail = (emailId: string) => {
@@ -355,12 +368,12 @@ const KanbanBoard = () => {
                                     return { ...email, summary: data.summary, hasSummary: true };
                                 }
                                 return email;
-                            })
+                            }),
                         );
                     }
                 },
                 onSettled: () => setSummarizingId(null),
-            }
+            },
         );
     };
 
@@ -443,7 +456,7 @@ const KanbanBoard = () => {
             if (old.pages) {
                 // Check if email already exists in any page
                 const emailExists = old.pages.some((page: any) =>
-                    page.emails?.some((e: EmailCardDto) => e.id === email.id)
+                    page.emails?.some((e: EmailCardDto) => e.id === email.id),
                 );
                 if (emailExists) return old;
 
@@ -456,7 +469,7 @@ const KanbanBoard = () => {
                                   ...page,
                                   emails: [email, ...(page.emails || [])],
                               }
-                            : page
+                            : page,
                     ),
                 };
             }
@@ -512,7 +525,7 @@ const KanbanBoard = () => {
                         refetchType: "none",
                     });
                 },
-            }
+            },
         );
     };
 
@@ -571,12 +584,12 @@ const KanbanBoard = () => {
                 if (columnData?.pages) {
                     // Infinite query
                     hasEmail = columnData.pages.some((page: any) =>
-                        page.emails?.some((e: EmailCardDto) => e.id === emailToSnooze.id)
+                        page.emails?.some((e: EmailCardDto) => e.id === emailToSnooze.id),
                     );
                 } else if (columnData?.emails) {
                     // Regular query
                     hasEmail = columnData.emails.some(
-                        (e: EmailCardDto) => e.id === emailToSnooze.id
+                        (e: EmailCardDto) => e.id === emailToSnooze.id,
                     );
                 }
 
@@ -618,7 +631,7 @@ const KanbanBoard = () => {
                             ...page,
                             emails:
                                 page.emails?.filter(
-                                    (e: EmailCardDto) => e.id !== emailToSnooze.id
+                                    (e: EmailCardDto) => e.id !== emailToSnooze.id,
                                 ) || [],
                         })),
                     };
@@ -675,7 +688,7 @@ const KanbanBoard = () => {
                         refetchType: "none",
                     });
                 },
-            }
+            },
         );
 
         setEmailToSnooze(null);
@@ -723,7 +736,7 @@ const KanbanBoard = () => {
                 if (old.pages) {
                     // Check if email already exists
                     const emailExists = old.pages.some((page: any) =>
-                        page.emails?.some((e: EmailCardDto) => e.id === emailId)
+                        page.emails?.some((e: EmailCardDto) => e.id === emailId),
                     );
                     if (emailExists) return old;
 
@@ -736,7 +749,7 @@ const KanbanBoard = () => {
                                       ...page,
                                       emails: [snoozedEmail as any, ...(page.emails || [])],
                                   }
-                                : page
+                                : page,
                         ),
                     };
                 }
@@ -915,7 +928,7 @@ const KanbanBoard = () => {
                                     setNewColumnLabelName("");
                                     setShowAddModal(false);
                                 },
-                            }
+                            },
                         );
                     }}
                     showRenameModal={showRenameModal}
@@ -941,7 +954,7 @@ const KanbanBoard = () => {
                                     setRenameColumnName("");
                                     setShowRenameModal(false);
                                 },
-                            }
+                            },
                         );
                     }}
                     showAssignLabelModal={showAssignLabelModal}
@@ -1007,7 +1020,7 @@ const KanbanBoard = () => {
                                     setAssignLabelName("");
                                     setShowAssignLabelModal(false);
                                 },
-                            }
+                            },
                         );
                     }}
                     showDeleteModal={showDeleteModal}
@@ -1049,7 +1062,7 @@ const KanbanBoard = () => {
                                     });
                                     setShowReorderModal(false);
                                 },
-                            }
+                            },
                         );
                     }}
                     columnsConfig={columnsConfig}
@@ -1190,7 +1203,7 @@ const KanbanBoard = () => {
                                         setAssignLabelOption(
                                             column.labelIds?.length && column.labelIds[0] !== null
                                                 ? "existing"
-                                                : "none"
+                                                : "none",
                                         );
                                         setAssignLabelId(column.labelIds?.[0] || null);
                                         setShowAssignLabelModal(true);

@@ -20,6 +20,7 @@ import {
     sendEmail,
     replyOrForwardEmail,
 } from "./api";
+import { kanbanKeys } from "@/hooks/useKanbanQueries";
 
 // Helper type for update function
 type EmailsDataOrInfinite = EmailsData | InfiniteData<EmailsData, string | undefined>;
@@ -27,7 +28,7 @@ type EmailsDataOrInfinite = EmailsData | InfiniteData<EmailsData, string | undef
 const updateEmailInCache = (
     oldData: EmailsDataOrInfinite | undefined,
     emailId: string,
-    updateFn: (email: EmailMessage) => EmailMessage
+    updateFn: (email: EmailMessage) => EmailMessage,
 ): EmailsDataOrInfinite | undefined => {
     if (!oldData) return oldData;
 
@@ -57,7 +58,7 @@ const updateEmailInCache = (
 const updateThreadDetailInCache = (
     threadDetail: ThreadDetail | undefined,
     messageId: string,
-    updateFn: (message: ThreadMessage) => ThreadMessage
+    updateFn: (message: ThreadMessage) => ThreadMessage,
 ): ThreadDetail | undefined => {
     if (!threadDetail) return threadDetail;
 
@@ -71,7 +72,7 @@ const updateThreadDetailInCache = (
 const updateMailboxesInCache = (
     mailboxes: Mailbox[] | undefined,
     labelIds: string[],
-    unreadDifference: number
+    unreadDifference: number,
 ): Mailbox[] | undefined => {
     if (!mailboxes || unreadDifference === 0) return mailboxes;
 
@@ -127,7 +128,7 @@ export const useMarkAsReadMutation = () => {
                     }
                 } else if (data && typeof data === "object" && "emails" in data) {
                     const email = (data as EmailsData).emails.find(
-                        (e: EmailMessage) => e.id === emailId
+                        (e: EmailMessage) => e.id === emailId,
                     );
                     if (email) {
                         emailLabelIds = email.labelIds;
@@ -145,7 +146,7 @@ export const useMarkAsReadMutation = () => {
                         ...e,
                         isUnread: false,
                     }));
-                }
+                },
             );
 
             // Optimistic update - update thread detail
@@ -156,7 +157,7 @@ export const useMarkAsReadMutation = () => {
                         ...msg,
                         isUnread: false,
                     }));
-                }
+                },
             );
 
             // Optimistic update - update mailboxes unread count
@@ -164,7 +165,7 @@ export const useMarkAsReadMutation = () => {
             queryClient.setQueriesData(
                 { queryKey: mailboxesKeys.list() },
                 (oldData: Mailbox[] | undefined) =>
-                    updateMailboxesInCache(oldData, emailLabelIds, unreadDifference)
+                    updateMailboxesInCache(oldData, emailLabelIds, unreadDifference),
             );
 
             return { previousEmailsData, previousThreadsData, previousMailboxesData };
@@ -237,7 +238,7 @@ export const useMarkAsUnreadMutation = () => {
                     }
                 } else if (data && typeof data === "object" && "emails" in data) {
                     const email = (data as EmailsData).emails.find(
-                        (e: EmailMessage) => e.id === emailId
+                        (e: EmailMessage) => e.id === emailId,
                     );
                     if (email) {
                         emailLabelIds = email.labelIds;
@@ -255,7 +256,7 @@ export const useMarkAsUnreadMutation = () => {
                         ...e,
                         isUnread: true,
                     }));
-                }
+                },
             );
 
             // Optimistic update - update thread detail
@@ -266,7 +267,7 @@ export const useMarkAsUnreadMutation = () => {
                         ...msg,
                         isUnread: true,
                     }));
-                }
+                },
             );
 
             // Optimistic update - update mailboxes unread count
@@ -274,7 +275,7 @@ export const useMarkAsUnreadMutation = () => {
             queryClient.setQueriesData(
                 { queryKey: mailboxesKeys.list() },
                 (oldData: Mailbox[] | undefined) =>
-                    updateMailboxesInCache(oldData, emailLabelIds, unreadDifference)
+                    updateMailboxesInCache(oldData, emailLabelIds, unreadDifference),
             );
 
             return { previousEmailsData, previousThreadsData, previousMailboxesData };
@@ -331,7 +332,7 @@ export const useStarEmailMutation = () => {
                         ...e,
                         isStarred: true,
                     }));
-                }
+                },
             );
 
             queryClient.setQueriesData(
@@ -341,7 +342,7 @@ export const useStarEmailMutation = () => {
                         ...msg,
                         isStarred: true,
                     }));
-                }
+                },
             );
 
             return { previousEmailsData, previousThreadsData };
@@ -390,7 +391,7 @@ export const useUnstarEmailMutation = () => {
                         ...e,
                         isStarred: false,
                     }));
-                }
+                },
             );
 
             queryClient.setQueriesData(
@@ -400,7 +401,7 @@ export const useUnstarEmailMutation = () => {
                         ...msg,
                         isStarred: false,
                     }));
-                }
+                },
             );
 
             return { previousEmailsData, previousThreadsData };
@@ -466,7 +467,7 @@ export const useDeleteEmailMutation = () => {
                     }
 
                     return oldData;
-                }
+                },
             );
 
             // Optimistic update - remove from thread
@@ -479,7 +480,7 @@ export const useDeleteEmailMutation = () => {
                         ...oldData,
                         messages: oldData.messages.filter((msg) => msg.id !== emailId),
                     };
-                }
+                },
             );
 
             return { previousEmailsData, previousThreadsData };
@@ -499,6 +500,13 @@ export const useDeleteEmailMutation = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: mailboxesKeys.emails() });
             queryClient.invalidateQueries({ queryKey: mailboxesKeys.threads() });
+            if (localStorage.getItem("inboxColumnId")) {
+                queryClient.invalidateQueries({
+                    queryKey: kanbanKeys.column(+localStorage.getItem("inboxColumnId")!, {
+                        search: "",
+                    }),
+                });
+            }
         },
     });
 };
@@ -512,6 +520,13 @@ export const useBatchDeleteEmailsMutation = () => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: mailboxesKeys.emails() });
             queryClient.invalidateQueries({ queryKey: mailboxesKeys.threads() });
+            if (localStorage.getItem("inboxColumnId")) {
+                queryClient.invalidateQueries({
+                    queryKey: kanbanKeys.column(+localStorage.getItem("inboxColumnId")!, {
+                        search: "",
+                    }),
+                });
+            }
         },
     });
 };
@@ -550,8 +565,8 @@ export const useSendEmailMutation = () => {
         mutationFn: sendEmail,
         onSuccess: () => {
             // Invalidate để refresh danh sách email
-            queryClient.invalidateQueries({ queryKey: ['emails'] });
-            queryClient.invalidateQueries({ queryKey: ['mailboxes'] });
+            queryClient.invalidateQueries({ queryKey: ["emails"] });
+            queryClient.invalidateQueries({ queryKey: ["mailboxes"] });
         },
     });
 };
@@ -564,9 +579,9 @@ export const useReplyForwardEmailMutation = () => {
             return replyOrForwardEmail(emailId, data);
         },
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['emails'] });
-            queryClient.invalidateQueries({ queryKey: ['mailboxes'] });
-            queryClient.invalidateQueries({ queryKey: ['thread'] });
+            queryClient.invalidateQueries({ queryKey: ["emails"] });
+            queryClient.invalidateQueries({ queryKey: ["mailboxes"] });
+            queryClient.invalidateQueries({ queryKey: ["thread"] });
         },
     });
 };

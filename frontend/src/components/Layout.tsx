@@ -1,11 +1,13 @@
 import { LayoutGrid, LogOut, Mail } from "lucide-react";
 import React, { useEffect } from "react";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 
 import { ModeToggle } from "@/components/mode-toggle.tsx";
 import { mockAuthAPI as authAPI } from "@/services/mockAuth.ts";
 import { logout } from "@/store/authSlice.ts";
+import { useEmailSocket } from "@/hooks/useEmailSocket";
+import { type RootState } from "@/store";
 
 import { Button } from "./ui/button";
 
@@ -16,6 +18,8 @@ interface LayoutProps {
 const Layout: React.FC<LayoutProps> = ({ children }) => {
     const dispatch = useDispatch();
     const navigate = useNavigate();
+    const { user } = useSelector((state: RootState) => state.auth);
+
     const handleLogout = () => {
         dispatch(logout());
         navigate("/login");
@@ -29,6 +33,22 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             navigate("/kanban");
         }
     };
+
+    // Setup email socket listener
+    useEmailSocket({
+        userEmail: user?.email || "",
+        onEmailNew: (event) => {
+            console.log("New emails received via socket:", event);
+        },
+        onConnected: () => {
+            console.log("Email socket connected");
+        },
+        onDisconnected: () => {
+            console.log("Email socket disconnected");
+        },
+        enabled: !!user?.email,
+    });
+
     useEffect(() => {
         const token = localStorage.getItem("token");
         if (token) {

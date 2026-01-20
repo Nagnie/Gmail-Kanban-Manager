@@ -118,7 +118,7 @@ export class EmailSynceService {
     `.trim();
   }
 
-  async syncFirstBatch(userId: number): Promise<void> {
+  async syncFirstBatch(userId: number): Promise<string[]> {
     const gmail = await this.gmailService.getAuthenticatedGmailClient(userId);
 
     const listRes = await gmail.users.messages.list({
@@ -127,7 +127,7 @@ export class EmailSynceService {
     });
 
     const messages = listRes.data.messages || [];
-    if (messages.length === 0) return;
+    if (messages.length === 0) return [];
 
     const nextPageToken = listRes.data.nextPageToken;
 
@@ -153,6 +153,8 @@ export class EmailSynceService {
         new EmailSyncEvent(userId, nextPageToken, 1),
       );
     }
+
+    return emailIds;
   }
 
   async generateEmbeddingsForEmails(

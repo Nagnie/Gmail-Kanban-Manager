@@ -106,6 +106,18 @@ export class SnoozeGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.log(`Notified user ${userId} about email ${emailId}`);
   }
 
+  // Notify user about new emails (used by Gmail poller/sync)
+  notifyNewEmails(userId: string, emailIds: string[]) {
+    this.server.to(`user:${userId}`).emit('email:new', {
+      emailIds,
+      timestamp: new Date().toISOString(),
+    });
+
+    this.logger.log(
+      `Notified user ${userId} about ${emailIds.length} new email(s)`,
+    );
+  }
+
   // Check if user is online
   async isUserOnline(userId: string): Promise<boolean> {
     return await this.connectionManager.isConnectedGlobally(userId);

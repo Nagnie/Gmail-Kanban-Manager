@@ -16,7 +16,7 @@ import { SearchHistory } from './entities/email.search-history.entity';
 @Module({
   imports: [
     TypeOrmModule.forFeature([Email, SearchHistory]),
-    GmailModule,
+    forwardRef(() => GmailModule),
     forwardRef(() => SnoozeModule),
   ],
   controllers: [EmailController, EmailSyncController, EmailSearchController],
@@ -27,6 +27,6 @@ import { SearchHistory } from './entities/email.search-history.entity';
     EmailSyncListener,
     EmailEmbeddingListener,
   ],
-  exports: [EmailService],
+  exports: [EmailService, EmailSynceService],
 })
 export class EmailModule {}

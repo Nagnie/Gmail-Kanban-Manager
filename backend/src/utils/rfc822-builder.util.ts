@@ -1,5 +1,5 @@
 import { SendEmailDto, AttachmentDto } from '../email/dto/send-email.dto';
-import { generateBoundary } from './email-encoder.util';
+import { generateBoundary, encodeHeaderValue } from './email-encoder.util';
 
 interface BodyParts {
   textBody?: string;
@@ -65,7 +65,8 @@ function addEmailHeaders(lines: string[], sendDto: SendEmailDto): void {
     lines.push(`Bcc: ${sendDto.bcc.join(', ')}`);
   }
 
-  lines.push(`Subject: ${sendDto.subject}`);
+  // Encode subject for RFC 2047 compliance (handles Vietnamese and other non-ASCII characters)
+  lines.push(`Subject: ${encodeHeaderValue(sendDto.subject)}`);
 
   // Add threading headers for reply/forward emails
   // These headers ensure Gmail properly threads the conversation

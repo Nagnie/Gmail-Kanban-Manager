@@ -10,7 +10,7 @@ interface UseMailboxEmailsOptions {
  * Replaces RTK Query useMailboxEmailsInfinite hook
  */
 export const useMailboxEmails = ({ labelId, q }: UseMailboxEmailsOptions) => {
-    const { data, hasNextPage, fetchNextPage, isFetching, isPending, error, isError } =
+    const { data, hasNextPage, fetchNextPage, isFetching, isPending, error, isError, refetch } =
         useInfiniteQueryGetMailboxEmails(labelId, q);
 
     // Flatten pages into single array
@@ -26,8 +26,6 @@ export const useMailboxEmails = ({ labelId, q }: UseMailboxEmailsOptions) => {
         resetPagination: () => {
             // TanStack Query handles this automatically on refetch
         },
-        refetch: () => {
-            // Refetch is built-in
-        },
+        refetch,
     };
 };

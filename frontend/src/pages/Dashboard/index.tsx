@@ -14,6 +14,7 @@ import {
     Search,
     Sparkles,
     TextSearch,
+    MoveRight,
 } from "lucide-react";
 import React, { useEffect, useState } from "react";
 
@@ -24,6 +25,12 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { FuzzySearchBar } from "@/components/FuzzySearchBar";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import { useMailboxEmails } from "@/hooks/useMailboxEmails";
@@ -37,6 +44,7 @@ import {
     useMarkAsUnreadMutation,
     useStarEmailMutation,
     useUnstarEmailMutation,
+    useBatchModifyEmailsMutation,
 } from "@/services/tanstack-query";
 
 import type { EmailMessage } from "@/services/mailboxes";
@@ -66,6 +74,7 @@ export default function Dashboard() {
     const { mutate: unstarEmail } = useUnstarEmailMutation();
     const { mutate: markAsRead } = useMarkAsReadMutation();
     const { mutate: markAsUnread } = useMarkAsUnreadMutation();
+    const { mutate: batchModifyEmails } = useBatchModifyEmailsMutation();
 
     const [selectedFolder, setSelectedFolder] = useState("INBOX");
     const [selectedEmail, setSelectedEmail] = useState<EmailMessage | null>(null);
@@ -101,6 +110,7 @@ export default function Dashboard() {
         isFetching: isFetchingEmails,
         hasNextPage,
         loadNextPage,
+        refetch,
     } = useMailboxEmails({
         labelId: selectedFolder || "",
         q: searchMode === "folder" ? folderSearchQuery : "",
@@ -236,6 +246,18 @@ export default function Dashboard() {
         }
     };
 
+    const handleMoveToFolder = (targetLabelId: string) => {
+        const emailIds = Array.from(selectedEmailIds);
+        if (emailIds.length === 0) return;
+
+        batchModifyEmails({
+            ids: emailIds,
+            addLabelIds: [targetLabelId],
+            removeLabelIds: [selectedFolder],
+        });
+        setSelectedEmailIds(new Set());
+    };
+
     const handleKeyDown = (e: React.KeyboardEvent, email: EmailMessage) => {
         if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
@@ -259,7 +281,14 @@ export default function Dashboard() {
                     <Menu className="w-5 h-5" />
                 </Button>
                 <h1 className="text-lg font-semibold">Email</h1>
-                <Button variant={"default"} onClick={() => setComposeMode("compose")} size="sm">
+                <Button
+                    variant={"default"}
+                    onClick={() => {
+                        setComposeMode("compose");
+                        setShowMobileDetail(true);
+                    }}
+                    size="sm"
+                >
                     <Plus className="w-4 h-4" />
                 </Button>
             </div>
@@ -396,7 +425,10 @@ export default function Dashboard() {
 
                         <div className="flex items-center gap-2 flex-wrap">
                             <Button
-                                onClick={() => setComposeMode("compose")}
+                                onClick={() => {
+                                    setComposeMode("compose");
+                                    setShowMobileDetail(true);
+                                }}
                                 size="sm"
                                 className="hidden lg:flex cursor-pointer"
                             >
@@ -409,6 +441,7 @@ export default function Dashboard() {
                                 size="sm"
                                 onClick={() => {
                                     // TanStack Query handles refetch automatically
+                                    refetch();
                                 }}
                                 disabled={isFetchingEmails || isLoadingMailboxes}
                             >
@@ -448,14 +481,49 @@ export default function Dashboard() {
                                     >
                                         Mark Unread
                                     </Button>
-                                    <Button
-                                        variant="destructive"
-                                        className="cursor-pointer"
-                                        size="sm"
-                                        onClick={handleDelete}
-                                    >
-                                        <Trash className="w-4 h-4" />
-                                    </Button>
+                                    {selectedFolder === "TRASH" ? (
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button
+                                                    variant="outline"
+                                                    className="cursor-pointer"
+                                                    size="sm"
+                                                >
+                                                    <MoveRight className="w-4 h-4 mr-1" />
+                                                    Move to
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                {folders
+                                                    .filter(
+                                                        (f) => f.id !== "TRASH" && f.id !== "SENT",
+                                                    )
+                                                    .map((folder) => (
+                                                        <DropdownMenuItem
+                                                            key={folder.id}
+                                                            onClick={() =>
+                                                                handleMoveToFolder(folder.id)
+                                                            }
+                                                            className="cursor-pointer"
+                                                        >
+                                                            {folder.icon}
+                                                            <span className="ml-2">
+                                                                {folder.name}
+                                                            </span>
+                                                        </DropdownMenuItem>
+                                                    ))}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    ) : (
+                                        <Button
+                                            variant="destructive"
+                                            className="cursor-pointer"
+                                            size="sm"
+                                            onClick={handleDelete}
+                                        >
+                                            <Trash className="w-4 h-4" />
+                                        </Button>
+                                    )}
                                 </>
                             )}
                         </div>
@@ -615,6 +683,8 @@ export default function Dashboard() {
                             onClose={() => {
                                 setComposeMode(null);
                                 setReplyData(undefined);
+                                setSelectedEmail(null);
+                                setShowMobileDetail(false);
                             }}
                             replyTo={replyData}
                         />

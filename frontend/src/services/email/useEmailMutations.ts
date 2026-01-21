@@ -517,6 +517,144 @@ export const useBatchDeleteEmailsMutation = () => {
 
     return useMutation({
         mutationFn: batchDeleteEmails,
+        onMutate: async (variables: { ids: string[] }) => {
+            const emailIds = variables.ids;
+
+            // Cancel ongoing queries
+            await queryClient.cancelQueries({ queryKey: mailboxesKeys.emails() });
+            await queryClient.cancelQueries({ queryKey: mailboxesKeys.threads() });
+            await queryClient.cancelQueries({ queryKey: mailboxesKeys.list() });
+
+            // Snapshot old data
+            const previousEmailsData = queryClient.getQueriesData({
+                queryKey: mailboxesKeys.emails(),
+            });
+
+            const previousThreadsData = queryClient.getQueriesData({
+                queryKey: mailboxesKeys.threads(),
+            });
+
+            const previousMailboxesData = queryClient.getQueriesData({
+                queryKey: mailboxesKeys.list(),
+            });
+
+            // Track label IDs and unread count for all deleted emails
+            let emailsLabelIds: Map<string, string[]> = new Map();
+            let totalUnreadDeleted = 0;
+
+            for (const [, data] of previousEmailsData) {
+                if (data && typeof data === "object" && "pages" in data) {
+                    for (const page of (data as InfiniteData<EmailsData>).pages) {
+                        for (const email of page.emails) {
+                            if (emailIds.includes(email.id)) {
+                                emailsLabelIds.set(email.id, email.labelIds);
+                                if (email.isUnread) totalUnreadDeleted++;
+                            }
+                        }
+                    }
+                } else if (data && typeof data === "object" && "emails" in data) {
+                    for (const email of (data as EmailsData).emails) {
+                        if (emailIds.includes(email.id)) {
+                            emailsLabelIds.set(email.id, email.labelIds);
+                            if (email.isUnread) totalUnreadDeleted++;
+                        }
+                    }
+                }
+            }
+
+            // Optimistic update - remove emails from all queries
+            queryClient.setQueriesData(
+                { queryKey: mailboxesKeys.emails() },
+                (oldData: EmailsDataOrInfinite | undefined) => {
+                    if (!oldData) return oldData;
+
+                    if ("pages" in oldData) {
+                        return {
+                            ...oldData,
+                            pages: oldData.pages.map((page) => ({
+                                ...page,
+                                emails: page.emails.filter(
+                                    (e: EmailMessage) => !emailIds.includes(e.id),
+                                ),
+                            })),
+                        };
+                    }
+
+                    if ("emails" in oldData) {
+                        return {
+                            ...oldData,
+                            emails: oldData.emails.filter(
+                                (e: EmailMessage) => !emailIds.includes(e.id),
+                            ),
+                        };
+                    }
+
+                    return oldData;
+                },
+            );
+
+            // Optimistic update - remove from thread detail
+            queryClient.setQueriesData(
+                { queryKey: mailboxesKeys.threads() },
+                (oldData: ThreadDetail | undefined) => {
+                    if (!oldData) return oldData;
+
+                    return {
+                        ...oldData,
+                        messages: oldData.messages.filter((msg) => !emailIds.includes(msg.id)),
+                    };
+                },
+            );
+
+            // Optimistic update - update mailboxes unread count
+            if (totalUnreadDeleted > 0) {
+                queryClient.setQueriesData(
+                    { queryKey: mailboxesKeys.list() },
+                    (oldData: Mailbox[] | undefined) => {
+                        if (!oldData || totalUnreadDeleted === 0) return oldData;
+
+                        // Collect all unique label IDs from deleted emails
+                        const affectedLabelIds = new Set<string>();
+                        for (const labelIds of emailsLabelIds.values()) {
+                            labelIds.forEach((id) => affectedLabelIds.add(id));
+                        }
+
+                        return oldData.map((mailbox) => {
+                            if (affectedLabelIds.has(mailbox.id)) {
+                                return {
+                                    ...mailbox,
+                                    messagesUnread: Math.max(
+                                        0,
+                                        mailbox.messagesUnread - totalUnreadDeleted,
+                                    ),
+                                };
+                            }
+                            return mailbox;
+                        });
+                    },
+                );
+            }
+
+            return { previousEmailsData, previousThreadsData, previousMailboxesData };
+        },
+        onError: (_err, _variables, context) => {
+            // Rollback on error
+            if (context?.previousEmailsData) {
+                context.previousEmailsData.forEach(([key, value]) => {
+                    queryClient.setQueryData(key, value);
+                });
+            }
+            if (context?.previousThreadsData) {
+                context.previousThreadsData.forEach(([key, value]) => {
+                    queryClient.setQueryData(key, value);
+                });
+            }
+            if (context?.previousMailboxesData) {
+                context.previousMailboxesData.forEach(([key, value]) => {
+                    queryClient.setQueryData(key, value);
+                });
+            }
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: mailboxesKeys.emails() });
             queryClient.invalidateQueries({ queryKey: mailboxesKeys.threads() });
@@ -551,6 +689,168 @@ export const useBatchModifyEmailsMutation = () => {
 
     return useMutation({
         mutationFn: batchModifyEmails,
+        onMutate: async (variables: {
+            ids?: string[];
+            addLabelIds?: string[];
+            removeLabelIds?: string[];
+        }) => {
+            const emailIds = variables.ids || [];
+            const addLabelIds = variables.addLabelIds || [];
+            const removeLabelIds = variables.removeLabelIds || [];
+
+            // Cancel ongoing queries
+            await queryClient.cancelQueries({ queryKey: mailboxesKeys.emails() });
+            await queryClient.cancelQueries({ queryKey: mailboxesKeys.threads() });
+            await queryClient.cancelQueries({ queryKey: mailboxesKeys.list() });
+
+            // Snapshot old data
+            const previousEmailsData = queryClient.getQueriesData({
+                queryKey: mailboxesKeys.emails(),
+            });
+
+            const previousThreadsData = queryClient.getQueriesData({
+                queryKey: mailboxesKeys.threads(),
+            });
+
+            const previousMailboxesData = queryClient.getQueriesData({
+                queryKey: mailboxesKeys.list(),
+            });
+
+            // Track emails to move for label updates
+            let emailsToMove: Map<string, { labelIds: string[]; isUnread: boolean }> = new Map();
+
+            // Collect email info before moving
+            for (const [, data] of previousEmailsData) {
+                if (data && typeof data === "object" && "pages" in data) {
+                    for (const page of (data as InfiniteData<EmailsData>).pages) {
+                        for (const email of page.emails) {
+                            if (emailIds.includes(email.id)) {
+                                emailsToMove.set(email.id, {
+                                    labelIds: email.labelIds,
+                                    isUnread: email.isUnread,
+                                });
+                            }
+                        }
+                    }
+                } else if (data && typeof data === "object" && "emails" in data) {
+                    for (const email of (data as EmailsData).emails) {
+                        if (emailIds.includes(email.id)) {
+                            emailsToMove.set(email.id, {
+                                labelIds: email.labelIds,
+                                isUnread: email.isUnread,
+                            });
+                        }
+                    }
+                }
+            }
+
+            // Optimistic update - move emails between labels
+            queryClient.setQueriesData(
+                { queryKey: mailboxesKeys.emails() },
+                (oldData: EmailsDataOrInfinite | undefined) => {
+                    if (!oldData) return oldData;
+
+                    if ("pages" in oldData) {
+                        return {
+                            ...oldData,
+                            pages: oldData.pages.map((page) => ({
+                                ...page,
+                                emails: page.emails
+                                    .filter((e: EmailMessage) => !emailIds.includes(e.id))
+                                    .map((e: EmailMessage) => {
+                                        // Add label to email if it's being added to this query's label
+                                        if (emailIds.includes(e.id) && addLabelIds.length > 0) {
+                                            return {
+                                                ...e,
+                                                labelIds: [
+                                                    ...e.labelIds.filter(
+                                                        (id) => !removeLabelIds.includes(id),
+                                                    ),
+                                                    ...addLabelIds,
+                                                ],
+                                            };
+                                        }
+                                        return e;
+                                    }),
+                            })),
+                        };
+                    }
+
+                    if ("emails" in oldData) {
+                        return {
+                            ...oldData,
+                            emails: oldData.emails
+                                .filter((e: EmailMessage) => !emailIds.includes(e.id))
+                                .map((e: EmailMessage) => {
+                                    if (emailIds.includes(e.id) && addLabelIds.length > 0) {
+                                        return {
+                                            ...e,
+                                            labelIds: [
+                                                ...e.labelIds.filter(
+                                                    (id) => !removeLabelIds.includes(id),
+                                                ),
+                                                ...addLabelIds,
+                                            ],
+                                        };
+                                    }
+                                    return e;
+                                }),
+                        };
+                    }
+
+                    return oldData;
+                },
+            );
+
+            // Optimistic update - update mailboxes unread count
+            const unreadToAdd = Array.from(emailsToMove.values()).filter((e) => e.isUnread).length;
+
+            queryClient.setQueriesData(
+                { queryKey: mailboxesKeys.list() },
+                (oldData: Mailbox[] | undefined) => {
+                    if (!oldData) return oldData;
+
+                    return oldData.map((mailbox) => {
+                        let newUnreadCount = mailbox.messagesUnread;
+
+                        // Decrease unread from removed labels
+                        if (removeLabelIds.includes(mailbox.id)) {
+                            newUnreadCount = Math.max(0, newUnreadCount - unreadToAdd);
+                        }
+
+                        // Increase unread to added labels
+                        if (addLabelIds.includes(mailbox.id)) {
+                            newUnreadCount = Math.max(0, newUnreadCount + unreadToAdd);
+                        }
+
+                        return {
+                            ...mailbox,
+                            messagesUnread: newUnreadCount,
+                        };
+                    });
+                },
+            );
+
+            return { previousEmailsData, previousThreadsData, previousMailboxesData };
+        },
+        onError: (_err, _variables, context) => {
+            // Rollback on error
+            if (context?.previousEmailsData) {
+                context.previousEmailsData.forEach(([key, value]) => {
+                    queryClient.setQueryData(key, value);
+                });
+            }
+            if (context?.previousThreadsData) {
+                context.previousThreadsData.forEach(([key, value]) => {
+                    queryClient.setQueryData(key, value);
+                });
+            }
+            if (context?.previousMailboxesData) {
+                context.previousMailboxesData.forEach(([key, value]) => {
+                    queryClient.setQueryData(key, value);
+                });
+            }
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: mailboxesKeys.emails() });
             queryClient.invalidateQueries({ queryKey: mailboxesKeys.threads() });

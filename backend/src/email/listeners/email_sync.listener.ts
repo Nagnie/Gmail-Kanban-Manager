@@ -47,6 +47,17 @@ export class EmailSyncListener {
           );
         }
 
+        // Trigger embedding generation for new emails
+        if (newEmailIds.length > 0) {
+          this.logger.log(
+            `[User ${userId}] Triggering background embedding generation for ${newEmailIds.length} emails...`,
+          );
+          this.eventEmitter.emit(
+            'email.embedding',
+            new EmailEmbeddingEvent(userId, newEmailIds, 1),
+          );
+        }
+
         // Check if there are more pages to sync
         this.logger.log(`[User ${userId}] Checking for next pages...`);
         const historyRes = await this.gmailService.getMailboxHistory(
@@ -113,6 +124,17 @@ export class EmailSyncListener {
           this.snoozeGateway.notifyNewEmails(
             userId.toString(),
             allChangedEmailIds,
+          );
+        }
+
+        // Trigger embedding generation for new emails
+        if (result.newEmailIds.length > 0) {
+          this.logger.log(
+            `[User ${userId}] Triggering background embedding generation for ${result.newEmailIds.length} emails...`,
+          );
+          this.eventEmitter.emit(
+            'email.embedding',
+            new EmailEmbeddingEvent(userId, result.newEmailIds, 1),
           );
         }
 

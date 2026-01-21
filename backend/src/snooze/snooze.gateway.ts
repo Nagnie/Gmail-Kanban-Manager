@@ -38,7 +38,7 @@ export class SnoozeGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   async handleDisconnect(client: Socket) {
-    const userId = client.data.userId;
+    const userId = client.data.userId as string;
 
     if (userId) {
       await this.connectionManager.removeConnection(userId, client.id);
@@ -63,7 +63,7 @@ export class SnoozeGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return { success: false, error: 'userId required' };
     }
 
-    client.join(`user:${userId}`);
+    await client.join(`user:${userId}`);
     client.data.userId = userId;
 
     await this.connectionManager.addConnection(userId, client.id);
@@ -90,7 +90,7 @@ export class SnoozeGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return { success: false, error: 'userId required' };
     }
 
-    client.leave(`user:${userId}`);
+    await client.leave(`user:${userId}`);
     await this.connectionManager.removeConnection(userId, client.id);
     return { success: true };
   }
@@ -114,7 +114,7 @@ export class SnoozeGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
 
     this.logger.log(
-      `Notified user ${userId} about ${emailIds.length} new email(s)`,
+      `Notified user ${userId} about ${emailIds.length} email change(s)`,
     );
   }
 

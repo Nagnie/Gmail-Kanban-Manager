@@ -20,25 +20,143 @@ export class EmailSyncListener {
 
   @OnEvent('email.sync', { async: true })
   async handleSyncOldEmails(payload: EmailSyncEvent) {
-    const { userId, pageToken, pageCount } = payload;
+    const { userId, pageToken, pageCount, deletedEmailIds } = payload;
 
-    // pageCount = 0 là first batch
+    // pageCount = 0 là first sync from scheduler
     if (pageCount === 0) {
       try {
-        this.logger.debug(`Starting background sync for User ${userId}...`);
-        const savedIds = await this.emailSyncService.syncFirstBatch(userId);
+        this.logger.log(
+          `[User ${userId}] Starting history sync (pageCount=0)...`,
+        );
+        const { newEmailIds, deletedEmailIds: firstDeletedIds } =
+          await this.emailSyncService.syncEmailsWithHistory(userId);
 
-        if (savedIds && savedIds.length > 0) {
-          // Notify frontend about saved email IDs via SnoozeGateway
-          this.snoozeGateway.notifyNewEmails(userId.toString(), savedIds);
+        this.logger.log(
+          `[User ${userId}] History sync completed. New: ${newEmailIds.length}, Deleted: ${firstDeletedIds.length}`,
+        );
+
+        const allChangedEmailIds = [...newEmailIds, ...firstDeletedIds];
+
+        if (allChangedEmailIds.length > 0) {
+          this.logger.log(
+            `[User ${userId}] Notifying client about ${allChangedEmailIds.length} changed emails`,
+          );
+          this.snoozeGateway.notifyNewEmails(
+            userId.toString(),
+            allChangedEmailIds,
+          );
+        }
+
+        // Check if there are more pages to sync
+        this.logger.log(`[User ${userId}] Checking for next pages...`);
+        const historyRes = await this.gmailService.getMailboxHistory(
+          userId,
+          (await this.gmailService.getLastHistoryId(userId)) || undefined,
+        );
+
+        if (historyRes.nextPageToken) {
+          this.logger.log(
+            `[User ${userId}] Found nextPageToken, emitting page 1 event...`,
+          );
+          await this.sleep(1000);
+          this.eventEmitter.emit(
+            'email.sync',
+            new EmailSyncEvent(
+              userId,
+              historyRes.nextPageToken,
+              1,
+              firstDeletedIds,
+            ),
+          );
+        } else {
+          this.logger.log(`[User ${userId}] No more pages to sync.`);
         }
       } catch (error) {
-        this.logger.error(`Error starting sync for user ${userId}`, error);
+        this.logger.error(`Error syncing history for user ${userId}`, error);
       }
       return;
     }
 
-    // Xử lý các pages tiếp theo
+    // Xử lý các pages tiếp theo từ history API
+    if (pageCount === 1 && pageToken) {
+      try {
+        this.logger.log(
+          `[User ${userId}] Syncing history page ${pageCount} with pageToken...`,
+        );
+
+        const historyRes = await this.gmailService.getMailboxHistory(
+          userId,
+          undefined,
+          100,
+          pageToken,
+        );
+
+        this.logger.log(
+          `[User ${userId}] Page ${pageCount} returned ${historyRes.history?.length || 0} records`,
+        );
+
+        const result = await this.emailSyncService.processHistoryRecords(
+          userId,
+          historyRes,
+        );
+
+        const allChangedEmailIds = [
+          ...result.newEmailIds,
+          ...(deletedEmailIds || []),
+          ...result.deletedEmailIds,
+        ];
+
+        if (allChangedEmailIds.length > 0) {
+          this.logger.log(
+            `[User ${userId}] Notifying client about ${allChangedEmailIds.length} changed emails`,
+          );
+          this.snoozeGateway.notifyNewEmails(
+            userId.toString(),
+            allChangedEmailIds,
+          );
+        }
+
+        // Continue with next page if exists
+        if (historyRes.nextPageToken) {
+          this.logger.log(
+            `[User ${userId}] Found nextPageToken, emitting page ${pageCount + 1} event...`,
+          );
+          await this.sleep(1000);
+          this.eventEmitter.emit(
+            'email.sync',
+            new EmailSyncEvent(userId, historyRes.nextPageToken, 1, [
+              ...(deletedEmailIds || []),
+              ...result.deletedEmailIds,
+            ]),
+          );
+        } else {
+          this.logger.log(
+            `[User ${userId}] History sync job finished (all pages completed)`,
+          );
+          // Update lastHistoryId after all pages
+          if (
+            historyRes.historyId &&
+            typeof historyRes.historyId === 'string'
+          ) {
+            await this.gmailService.updateLastHistoryId(
+              userId,
+              historyRes.historyId,
+            );
+            this.logger.log(
+              `[User ${userId}] Final lastHistoryId updated: ${historyRes.historyId}`,
+            );
+          }
+        }
+      } catch (error) {
+        this.logger.error(
+          `Error syncing history pages for user ${userId}`,
+          error,
+        );
+      }
+      return;
+    }
+
+    // Xử lý pagination từ messages.list (pageCount > 1)
     if (!pageToken || pageCount > this.MAX_PAGES) {
       this.logger.log(
         `Background sync job finished for User ${userId}. Pages: ${pageCount}`,

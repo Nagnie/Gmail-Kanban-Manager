@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { GmailService } from './gmail.service';
 import { AtGuard } from 'src/auth/guards/at.guard';
 import { ApiSecurity } from '@nestjs/swagger';
@@ -16,9 +25,9 @@ export class GmailController {
 
   @Get('emails')
   async getEmails(
-    @Req() req, 
-    @Query('q') q: string, 
-    @Query('pageToken') pageToken: string
+    @Req() req,
+    @Query('q') q: string,
+    @Query('pageToken') pageToken: string,
   ) {
     return this.gmailService.listMessages(req.user.sub, q, pageToken);
   }

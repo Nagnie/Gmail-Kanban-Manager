@@ -3,6 +3,8 @@ import {
   Logger,
   OnModuleInit,
   OnModuleDestroy,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -13,6 +15,7 @@ import { WebSocketConnectionManager } from 'src/snooze/websocket-connection.mana
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { SnoozeGateway } from 'src/snooze/snooze.gateway';
 import { EmailSyncEvent } from 'src/email/events/email_sync.event';
+import { EmailSynceService } from 'src/email/sync/email_sync.service';
 
 @Injectable()
 export class GmailScheduler implements OnModuleInit, OnModuleDestroy {
@@ -27,6 +30,8 @@ export class GmailScheduler implements OnModuleInit, OnModuleDestroy {
     private readonly connectionManager: WebSocketConnectionManager,
     private readonly snoozeGateway: SnoozeGateway,
     private readonly configService: ConfigService,
+    @Inject(forwardRef(() => EmailSynceService))
+    private readonly emailSyncService: EmailSynceService,
   ) {}
 
   onModuleInit() {
@@ -78,33 +83,11 @@ export class GmailScheduler implements OnModuleInit, OnModuleDestroy {
 
           if (!isOnline) continue;
 
-          const gmailClient =
-            await this.gmailService.getAuthenticatedGmailClient(user.id);
-
-          const query = this.configService.get<string>('GMAIL_QUERY') || '';
-
-          const listRes = await gmailClient.users.messages.list({
-            userId: 'me',
-            maxResults: 100,
-            q: query || undefined,
-          });
-
-          const messages = listRes.data.messages || [];
-          if (messages.length === 0) continue;
-
-          // Trigger background sync via event emitter. The Email module
-          // listens to 'email.sync' events and will process pages in background.
+          // Emit event to trigger history sync in listener
           this.eventEmitter.emit(
             'email.sync',
-            new EmailSyncEvent(
-              user.id,
-              listRes.data.nextPageToken ?? undefined,
-              0,
-            ),
+            new EmailSyncEvent(user.id, undefined, 0, []),
           );
-
-          // Notify frontend that there are new messages; frontend can fetch details.
-          this.snoozeGateway.notifyNewEmails(user.id.toString(), []);
         } catch (e) {
           this.logger.warn(`Polling failed for user ${user.id}: ${e.message}`);
         }

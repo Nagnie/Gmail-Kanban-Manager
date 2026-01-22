@@ -91,6 +91,26 @@ export class KanbanController {
     return this.kanbanService.createColumn(req.user.sub, createColumnDto);
   }
 
+  @Put('columns/reorder')
+  @ApiSecurity('jwt')
+  @ApiOperation({
+    summary: 'Reorder columns',
+    description: 'Update the display order of multiple columns',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Columns reordered successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+      },
+    },
+  })
+  async reorderColumns(@Req() req, @Body() reorderDto: ReorderColumnsDto) {
+    return this.kanbanService.reorderColumns(req.user.sub, reorderDto);
+  }
+
   @Get('columns/:columnId')
   @ApiSecurity('jwt')
   @ApiOperation({
@@ -175,26 +195,6 @@ export class KanbanController {
     @Param('columnId', ParseIntPipe) columnId: number,
   ) {
     return this.kanbanService.deleteColumn(req.user.sub, columnId);
-  }
-
-  @Put('columns/reorder')
-  @ApiSecurity('jwt')
-  @ApiOperation({
-    summary: 'Reorder columns',
-    description: 'Update the display order of multiple columns',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Columns reordered successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean', example: true },
-      },
-    },
-  })
-  async reorderColumns(@Req() req, @Body() reorderDto: ReorderColumnsDto) {
-    return this.kanbanService.reorderColumns(req.user.sub, reorderDto);
   }
 
   @Post(':emailId/move')

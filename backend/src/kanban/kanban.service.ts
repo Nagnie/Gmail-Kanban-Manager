@@ -134,7 +134,7 @@ export class KanbanService {
 
     const savedColumns = await this.columnConfigRepository.save(entities);
 
-    return savedColumns;
+    return savedColumns.filter((col) => col.isActive);
   }
 
   async getUserColumns(userId: number): Promise<{

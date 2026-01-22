@@ -5,6 +5,7 @@ import { In, Repository } from 'typeorm';
 import { Email } from '../entities/email.entity';
 import { gmail_v1 } from 'googleapis';
 import { EmailSyncEvent } from '../events/email_sync.event';
+import { EmailFullSyncEvent } from '../events/email_full_sync.event';
 import { EmailEmbeddingEvent } from '../events/email_embedding.event';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { OpenRouterService } from 'src/open-router/open-router.service';
@@ -26,56 +27,98 @@ export class EmailSynceService {
     messages: gmail_v1.Schema$Message[],
     gmailClient: any,
   ): Promise<string[]> {
-    if (messages.length === 0) return [];
-
-    const existingIds = await this.emailRepository.find({
-      where: { id: In(messages.map((m) => m.id)) },
-      select: ['id'],
-    });
-    const existingIdSet = new Set(existingIds.map((e) => e.id));
-    const messagesToFetch = messages.filter(
-      (m) => !existingIdSet.has(m.id || ''),
-    );
-
-    if (messagesToFetch.length === 0) return [];
-
-    const fetchedEmails = await Promise.all(
-      messagesToFetch.map(async (msg) => {
-        try {
-          const detail = await gmailClient.users.messages.get({
-            format: 'metadata',
-            id: msg.id!,
-            metadataHeaders: ['Subject', 'From', 'Date'],
-            userId: 'me',
-          });
-
-          const headers: any[] = detail.data.payload?.headers ?? [];
-          return {
-            id: msg.id!,
-            threadId: msg.threadId!,
-            snippet: detail.data.snippet ?? '',
-            internalDate: detail.data.internalDate ?? '',
-            subject: this.getHeader(headers ?? [], 'Subject'),
-            sender: this.getHeader(headers ?? [], 'From'),
-            userId: userId,
-          };
-        } catch (e) {
-          console.error(`Failed to fetch msg ${msg.id}`, e);
-          return null;
-        }
-      }),
-    );
-
-    const validEmails = fetchedEmails.filter((e) => e !== null);
-    if (validEmails.length > 0) {
-      await this.emailRepository.save(validEmails);
-
-      console.log(`Saved ${validEmails.length} emails for user ${userId}`);
-
-      return validEmails.map((email) => email.id);
+    if (messages.length === 0) {
+      this.logger.log(`[processAndSaveBatch] No messages to process for user ${userId}`);
+      return [];
     }
+    this.logger.log(
+      `[processAndSaveBatch] Processing ${messages.length} messages for user ${userId}...`,
+    );
+    this.logger.debug(
+      `[processAndSaveBatch] Full messages array: ${JSON.stringify(messages.map((m) => ({ id: m.id, threadId: m.threadId })))}`,
+    );
 
-    return [];
+    try {
+      const messageIds = messages.map((m) => m.id);
+      this.logger.log(
+        `[processAndSaveBatch] Message IDs to check (first 3): ${messageIds.slice(0, 3)}`,
+      );
+
+      const existingIds = await this.emailRepository.find({
+        where: { id: In(messageIds), userId },
+        select: ['id'],
+      });
+      this.logger.log(
+        `[processAndSaveBatch] Existing IDs in DB (first 3): ${existingIds.map((e) => e.id).slice(0, 3)}`,
+      );
+
+      const existingIdSet = new Set(existingIds.map((e) => e.id));
+      this.logger.debug(`[processAndSaveBatch] existingIdSet size: ${existingIdSet.size}`);
+      this.logger.debug(`[processAndSaveBatch] existingIdSet: ${JSON.stringify(Array.from(existingIdSet))}`);
+
+      const messagesToFetch = messages.filter((m) => {
+        const hasId = existingIdSet.has(m.id || '');
+        if (!hasId && messages.indexOf(m) < 3) {
+          // Log first 3 messages that are NOT in existingIdSet
+          this.logger.debug(
+            `[processAndSaveBatch] Message ID ${m.id} NOT in existingIdSet, will fetch`,
+          );
+        }
+        return !hasId;
+      });
+
+      this.logger.log(
+        `[processAndSaveBatch] User ${userId}: ${existingIdSet.size} already exist, ${messagesToFetch.length} new to fetch`,
+      );
+
+      if (messagesToFetch.length === 0) {
+        this.logger.log(`[processAndSaveBatch] All messages already exist for user ${userId}`);
+        return [];
+      }
+
+      const fetchedEmails = await Promise.all(
+        messagesToFetch.map(async (msg) => {
+          try {
+            const detail = await gmailClient.users.messages.get({
+              format: 'metadata',
+              id: msg.id!,
+              metadataHeaders: ['Subject', 'From', 'Date'],
+              userId: 'me',
+            });
+
+            const headers: any[] = detail.data.payload?.headers ?? [];
+            return {
+              id: msg.id!,
+              threadId: msg.threadId!,
+              snippet: detail.data.snippet ?? '',
+              internalDate: detail.data.internalDate ?? '',
+              subject: this.getHeader(headers ?? [], 'Subject'),
+              sender: this.getHeader(headers ?? [], 'From'),
+              userId: userId,
+            };
+          } catch (e) {
+            this.logger.error(`[processAndSaveBatch] Failed to fetch msg ${msg.id}`, e);
+            return null;
+          }
+        }),
+      );
+
+      const validEmails = fetchedEmails.filter((e) => e !== null);
+      this.logger.log(
+        `[processAndSaveBatch] User ${userId}: fetched ${validEmails.length}/${messagesToFetch.length} valid emails`,
+      );
+      if (validEmails.length > 0) {
+        await this.emailRepository.save(validEmails);
+        this.logger.log(`[processAndSaveBatch] Saved ${validEmails.length} emails for user ${userId}`);
+        return validEmails.map((email) => email.id);
+      }
+
+      this.logger.log(`[processAndSaveBatch] No new emails saved for user ${userId}`);
+      return [];
+    } catch (error) {
+      this.logger.error(`[processAndSaveBatch] Error processing batch for user ${userId}`, error);
+      return [];
+    }
   }
 
   async syncEmailsForUser(userId: number) {
@@ -89,23 +132,38 @@ export class EmailSynceService {
     const messages = listRes.data.messages || [];
     const nextPageToken = listRes.data.nextPageToken;
 
-    // Emit event ngay để xử lý tất cả trong background
+    // Check if user has any emails in DB already
+    const emailCount = await this.emailRepository.countBy({ userId });
+    this.logger.log(
+      `[syncEmailsForUser] User ${userId}: ${emailCount} emails already in database`,
+    );
+    const isFirstSync = emailCount === 0;
+
+    // Emit appropriate event based on first sync or not
     if (messages.length > 0) {
-      console.log(
-        `Triggering background sync for ${messages.length} emails...`,
-      );
-      this.eventEmitter.emit(
-        'email.sync',
-        new EmailSyncEvent(userId, nextPageToken!, 0), // pageCount = 0 để xử lý first batch
-      );
+      if (isFirstSync) {
+        // First sync: full sync
+        console.log(
+          `First sync detected for user ${userId}. Triggering full background sync for ${messages.length} emails...`,
+        );
+        this.eventEmitter.emit(
+          'email.full-sync',
+          new EmailFullSyncEvent(userId, nextPageToken ?? undefined, 0),
+        );
+      } else {
+        // Incremental sync: sync new/deleted emails
+        console.log(
+          `Incremental sync for user ${userId}. Triggering background sync for ${messages.length} emails...`,
+        );
+        this.eventEmitter.emit(
+          'email.sync',
+          new EmailSyncEvent(userId, nextPageToken ?? undefined, 0),
+        );
+      }
     }
 
-    // Return ngay emails hiện có trong DB
-    return this.emailRepository.find({
-      where: { userId },
-      order: { internalDate: 'DESC' },
-      take: 20,
-    });
+    // Return immediately without waiting for sync
+    return { success: true, message: 'Sync in progress' };
   }
 
   private getHeader(headers: any[], name: string): string {
@@ -135,11 +193,14 @@ export class EmailSynceService {
 
     // Process và save batch
     const emailIds = await this.processAndSaveBatch(userId, messages, gmail);
+    this.logger.log(
+      `[syncFirstBatch] User ${userId}: saved ${emailIds.length} emails, nextPageToken: ${!!nextPageToken}`,
+    );
 
     // Trigger embedding generation
     if (emailIds.length > 0) {
-      console.log(
-        `Triggering background embedding generation for ${emailIds.length} emails...`,
+      this.logger.log(
+        `[syncFirstBatch] Triggering background embedding generation for ${emailIds.length} emails...`,
       );
       this.eventEmitter.emit(
         'email.embedding',
@@ -147,12 +208,14 @@ export class EmailSynceService {
       );
     }
 
-    // Trigger sync pages tiếp theo
+    // Trigger full-sync pages tiếp theo (not email.sync)
     if (nextPageToken) {
-      console.log('Triggering next page sync...');
+      this.logger.log(
+        `[syncFirstBatch] Triggering next page full-sync for user ${userId}...`,
+      );
       this.eventEmitter.emit(
-        'email.sync',
-        new EmailSyncEvent(userId, nextPageToken, 1),
+        'email.full-sync',
+        new EmailFullSyncEvent(userId, nextPageToken, 1),
       );
     }
 

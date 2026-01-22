@@ -7,6 +7,7 @@ import { EmailSynceService } from './sync/email_sync.service';
 import { Email } from './entities/email.entity';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EmailSyncListener } from './listeners/email_sync.listener';
+import { EmailFullSyncListener } from './listeners/email_full_sync.listener';
 import { EmailSyncController } from './sync/email_sync.controller';
 import { EmailSearchService } from './search/email_search.service';
 import { EmailSearchController } from './search/email_search.controller';
@@ -25,6 +26,7 @@ import { SearchHistory } from './entities/email.search-history.entity';
     EmailSynceService,
     EmailSearchService,
     EmailSyncListener,
+    EmailFullSyncListener,
     EmailEmbeddingListener,
   ],
   exports: [EmailService, EmailSynceService],

@@ -48,7 +48,7 @@ export const loginUser = createAsyncThunk(
             const error = err as Error;
             return rejectWithValue(error.message || "Login failed");
         }
-    },
+    }
 );
 
 export const signupUser = createAsyncThunk(
@@ -61,7 +61,7 @@ export const signupUser = createAsyncThunk(
             const error = err as Error;
             return rejectWithValue(error.message || "Registration failed");
         }
-    },
+    }
 );
 
 export const googleLogin = createAsyncThunk(
@@ -75,7 +75,7 @@ export const googleLogin = createAsyncThunk(
             }
 
             // Lưu access token vào localStorage
-            // localStorage.setItem("accessToken", response.data.accessToken);
+            localStorage.setItem("accessToken", response.data.accessToken);
             localStorage.setItem("user", JSON.stringify(response.data.user));
 
             // sync gmail emails after login
@@ -86,7 +86,7 @@ export const googleLogin = createAsyncThunk(
             const error = err as Error;
             return rejectWithValue(error.message || "Google Login failed");
         }
-    },
+    }
 );
 
 export const initializeAuth = createAsyncThunk(
@@ -99,13 +99,13 @@ export const initializeAuth = createAsyncThunk(
                 throw new Error("Failed to refresh token");
             }
 
-            // localStorage.setItem("accessToken", response.data.accessToken);
+            localStorage.setItem("accessToken", response.data.accessToken);
             return response.data;
         } catch (err: unknown) {
             const error = err as Error;
             return rejectWithValue(error.message);
         }
-    },
+    }
 );
 
 const authSlice = createSlice({
@@ -210,7 +210,7 @@ const authSlice = createSlice({
                             state.user = action.payload.user;
                         }
                     }
-                },
+                }
             )
             .addCase(initializeAuth.rejected, (state) => {
                 state.isInitialized = true;

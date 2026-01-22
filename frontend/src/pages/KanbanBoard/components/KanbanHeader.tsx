@@ -236,11 +236,25 @@ export const KanbanHeader = ({
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem onClick={onAddColumn} className="cursor-pointer">
+                            <DropdownMenuItem
+                                onClick={() => {
+                                    requestAnimationFrame(() => {
+                                        onAddColumn();
+                                    });
+                                }}
+                                className="cursor-pointer"
+                            >
                                 <Plus className="w-4 h-4 mr-2" />
                                 Add Column
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={onReorderColumns} className="cursor-pointer">
+                            <DropdownMenuItem
+                                onClick={() => {
+                                    requestAnimationFrame(() => {
+                                        onReorderColumns();
+                                    });
+                                }}
+                                className="cursor-pointer"
+                            >
                                 <ArrowUpDown className="w-4 h-4 mr-2" />
                                 Reorder Columns
                             </DropdownMenuItem>

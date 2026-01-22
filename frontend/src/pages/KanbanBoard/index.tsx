@@ -1072,13 +1072,13 @@ const KanbanBoard = () => {
                 {showFilterPanel && inboxColumn && (
                     <>
                         <FilterPanel
-                            sortBy={inboxSettings.sortBy === "date-desc" ? "secondary" : "ghost"}
+                            sortBy={inboxSettings.sortBy}
                             filterUnread={inboxSettings.filterUnread}
                             filterAttachments={inboxSettings.filterAttachments}
-                            onChangeSortBy={() => {
+                            onChangeSortBy={(sortBy) => {
                                 updateColumnSettings(inboxColumn.id.toString(), (prev) => ({
                                     ...prev,
-                                    sortBy: "date-desc",
+                                    sortBy: sortBy as "date-desc" | "date-asc" | "sender",
                                 }));
                             }}
                             onToggleUnread={() => {

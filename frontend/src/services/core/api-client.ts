@@ -13,7 +13,6 @@ interface FailedQueueItem {
 
 class ApiClient {
     private client: AxiosInstance;
-    private accessToken: string | null = null;
     private isRefreshing = false;
     private failedQueue: FailedQueueItem[] = [];
 
@@ -44,7 +43,7 @@ class ApiClient {
         // Request interceptor: Thêm access token vào header
         this.client.interceptors.request.use(
             (config: RequestConfig) => {
-                const token = this.accessToken;
+                const token = localStorage.getItem("accessToken");
                 if (token && config.headers) {
                     config.headers.Authorization = `Bearer ${token}`;
                 }
@@ -94,7 +93,7 @@ class ApiClient {
                             throw new Error("No access token in refresh response");
                         }
 
-                        this.accessToken = newAccessToken;
+                        localStorage.setItem("accessToken", newAccessToken);
                         this.processQueue(null, newAccessToken);
 
                         if (originalRequest.headers) {
@@ -104,7 +103,7 @@ class ApiClient {
                         return this.client(originalRequest);
                     } catch (refreshError) {
                         this.processQueue(refreshError as Error, null);
-                        this.accessToken = null;
+                        localStorage.removeItem("accessToken");
                         localStorage.removeItem("user");
                         // Redirect to login hoặc dispatch logout action
                         window.dispatchEvent(new CustomEvent("auth-failed"));
